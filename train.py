@@ -13,6 +13,7 @@ import os
 import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim
+from utils.bernstein_utils import bernstein_surface_distance_loss
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -67,6 +68,17 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     viewpoint_indices = list(range(len(viewpoint_stack)))
     ema_loss_for_log = 0.0
     ema_Ll1depth_for_log = 0.0
+    ema_Lbsr_for_log = 0.0
+
+    def get_bsr_weight(iteration):
+        if not opt.use_bsr:
+            return 0.0
+        if iteration < opt.bsr_warmup_iters:
+            return 0.0
+        if opt.bsr_ramp_iters <= 0:
+            return opt.bsr_lambda_max
+        ramp_progress = min(1.0, (iteration - opt.bsr_warmup_iters) / float(opt.bsr_ramp_iters))
+        return opt.bsr_lambda_max * ramp_progress
 
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
@@ -125,6 +137,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim_value)
 
+        Lbsr = torch.tensor(0.0, device="cuda")
+        bsr_debug = {"num_bsr_points": 0, "mean_distance": 0.0}
+        bsr_weight = get_bsr_weight(iteration)
+        if bsr_weight > 0.0 and gaussians.has_bernstein_surface:
+            bsr_mask = gaussians.get_bsr_mask(opt.bsr_z_percentile, opt.bsr_opacity_threshold)
+            Lbsr, bsr_debug = bernstein_surface_distance_loss(
+                gaussians.get_xyz,
+                gaussians.get_bernstein_control_points,
+                point_mask=bsr_mask,
+                samples_u=opt.bsr_surface_samples_u,
+                samples_v=opt.bsr_surface_samples_v,
+                max_points=opt.bsr_max_points,
+            )
+            loss = loss + bsr_weight * Lbsr
+
         # Depth regularization
         Ll1depth_pure = 0.0
         if depth_l1_weight(iteration) > 0 and viewpoint_cam.depth_reliable:
@@ -147,15 +174,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # Progress bar
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
             ema_Ll1depth_for_log = 0.4 * Ll1depth + 0.6 * ema_Ll1depth_for_log
+            ema_Lbsr_for_log = 0.4 * Lbsr.item() + 0.6 * ema_Lbsr_for_log
 
             if iteration % 10 == 0:
-                progress_bar.set_postfix({"Loss": f"{ema_loss_for_log:.{7}f}", "Depth Loss": f"{ema_Ll1depth_for_log:.{7}f}"})
+                progress_bar.set_postfix({
+                    "Loss": f"{ema_loss_for_log:.{7}f}",
+                    "Depth Loss": f"{ema_Ll1depth_for_log:.{7}f}",
+                    "BSR": f"{ema_Lbsr_for_log:.{7}f}",
+                })
                 progress_bar.update(10)
             if iteration == opt.iterations:
                 progress_bar.close()
 
             # Log and save
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background, 1., SPARSE_ADAM_AVAILABLE, None, dataset.train_test_exp), dataset.train_test_exp)
+            if tb_writer:
+                tb_writer.add_scalar("train_loss_patches/bsr_loss", Lbsr.item(), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_weight", bsr_weight, iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_num_points", bsr_debug["num_bsr_points"], iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_mean_distance", bsr_debug["mean_distance"], iteration)
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
@@ -177,6 +214,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if iteration < opt.iterations:
                 gaussians.exposure_optimizer.step()
                 gaussians.exposure_optimizer.zero_grad(set_to_none = True)
+                if gaussians.bernstein_optimizer is not None:
+                    gaussians.bernstein_optimizer.step()
+                    gaussians.bernstein_optimizer.zero_grad(set_to_none = True)
                 if use_sparse_adam:
                     visible = radii > 0
                     gaussians.optimizer.step(visible, radii.shape[0])

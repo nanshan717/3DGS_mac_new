@@ -61,8 +61,10 @@ class GaussianModel:
         self.xyz_gradient_accum = torch.empty(0)
         self.denom = torch.empty(0)
         self.optimizer = None
+        self.bernstein_optimizer = None
         self.percent_dense = 0
         self.spatial_lr_scale = 0
+        self._bernstein_control_points = torch.empty(0)
         self.setup_functions()
 
     def capture(self):
@@ -79,6 +81,8 @@ class GaussianModel:
             self.denom,
             self.optimizer.state_dict(),
             self.spatial_lr_scale,
+            self._bernstein_control_points,
+            self.bernstein_optimizer.state_dict() if self.bernstein_optimizer is not None else None,
         )
     
     def restore(self, model_args, training_args):
@@ -93,11 +97,15 @@ class GaussianModel:
         xyz_gradient_accum, 
         denom,
         opt_dict, 
-        self.spatial_lr_scale) = model_args
+        self.spatial_lr_scale) = model_args[:12]
+        if len(model_args) > 12 and model_args[12].numel() > 0:
+            self._bernstein_control_points = nn.Parameter(model_args[12].detach().cuda().requires_grad_(True))
         self.training_setup(training_args)
         self.xyz_gradient_accum = xyz_gradient_accum
         self.denom = denom
         self.optimizer.load_state_dict(opt_dict)
+        if len(model_args) > 13 and model_args[13] is not None and self.bernstein_optimizer is not None:
+            self.bernstein_optimizer.load_state_dict(model_args[13])
 
     @property
     def get_scaling(self):
@@ -132,6 +140,14 @@ class GaussianModel:
     @property
     def get_exposure(self):
         return self._exposure
+
+    @property
+    def get_bernstein_control_points(self):
+        return self._bernstein_control_points
+
+    @property
+    def has_bernstein_surface(self):
+        return isinstance(self._bernstein_control_points, nn.Parameter) and self._bernstein_control_points.numel() > 0
 
     def get_exposure_from_name(self, image_name):
         if self.pretrained_exposures is None:
@@ -210,6 +226,50 @@ class GaussianModel:
                                                         lr_delay_mult=training_args.exposure_lr_delay_mult,
                                                         max_steps=training_args.iterations)
 
+        if training_args.use_bsr:
+            self.initialize_bernstein_surface(
+                training_args.bsr_control_points_u,
+                training_args.bsr_control_points_v,
+                training_args.bsr_z_percentile,
+            )
+            self.bernstein_optimizer = torch.optim.Adam(
+                [self._bernstein_control_points],
+                lr=training_args.bsr_control_lr,
+                eps=1e-15,
+            )
+        else:
+            self.bernstein_optimizer = None
+
+    def initialize_bernstein_surface(self, control_points_u, control_points_v, z_percentile):
+        if self.has_bernstein_surface:
+            return
+        if self.get_xyz.numel() == 0:
+            self._bernstein_control_points = nn.Parameter(torch.empty(0, device="cuda"))
+            return
+
+        with torch.no_grad():
+            xyz = self.get_xyz.detach()
+            x_min, y_min = xyz[:, :2].min(dim=0).values
+            x_max, y_max = xyz[:, :2].max(dim=0).values
+            z_base = torch.quantile(xyz[:, 2], float(z_percentile))
+
+            grid_x = torch.linspace(x_min, x_max, control_points_u, device=xyz.device, dtype=xyz.dtype)
+            grid_y = torch.linspace(y_min, y_max, control_points_v, device=xyz.device, dtype=xyz.dtype)
+            mesh_x, mesh_y = torch.meshgrid(grid_x, grid_y, indexing="ij")
+            mesh_z = torch.full_like(mesh_x, z_base)
+            control_points = torch.stack((mesh_x, mesh_y, mesh_z), dim=-1)
+
+        self._bernstein_control_points = nn.Parameter(control_points.requires_grad_(True))
+
+    def get_bsr_mask(self, z_percentile=0.2, opacity_threshold=0.05):
+        if self.get_xyz.numel() == 0:
+            return torch.empty(0, device="cuda", dtype=torch.bool)
+        with torch.no_grad():
+            z_cutoff = torch.quantile(self.get_xyz.detach()[:, 2], float(z_percentile))
+            bottom_mask = self.get_xyz.detach()[:, 2] <= z_cutoff
+            opacity_mask = self.get_opacity.detach().squeeze(-1) >= float(opacity_threshold)
+            return torch.logical_and(bottom_mask, opacity_mask)
+
     def update_learning_rate(self, iteration):
         ''' Learning rate scheduling per step '''
         if self.pretrained_exposures is None:
@@ -254,6 +314,15 @@ class GaussianModel:
         elements[:] = list(map(tuple, attributes))
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
+        self.save_bernstein_surface(os.path.join(os.path.dirname(path), "bernstein_surface.pt"))
+
+    def save_bernstein_surface(self, path):
+        if not self.has_bernstein_surface:
+            return
+        torch.save(
+            {"control_points": self._bernstein_control_points.detach().cpu()},
+            path,
+        )
 
     def reset_opacity(self):
         opacities_new = self.inverse_opacity_activation(torch.min(self.get_opacity, torch.ones_like(self.get_opacity)*0.01))

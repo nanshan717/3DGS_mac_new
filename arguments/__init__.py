@@ -97,6 +97,18 @@ class OptimizationParams(ParamGroup):
         self.depth_l1_weight_final = 0.01
         self.random_background = False
         self.optimizer_type = "default"
+        self.use_bsr = False
+        self.bsr_lambda_max = 0.01
+        self.bsr_warmup_iters = 1000
+        self.bsr_ramp_iters = 3000
+        self.bsr_control_points_u = 5
+        self.bsr_control_points_v = 5
+        self.bsr_surface_samples_u = 32
+        self.bsr_surface_samples_v = 32
+        self.bsr_max_points = 4096
+        self.bsr_z_percentile = 0.2
+        self.bsr_opacity_threshold = 0.05
+        self.bsr_control_lr = 0.001
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):
