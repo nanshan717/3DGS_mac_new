@@ -1,0 +1,73 @@
+running build_ext
+/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/utils/cpp_extension.py:398: UserWarning: There are no g++ version bounds defined for CUDA version 11.8
+  warnings.warn(f'There are no {compiler_name} version bounds defined for CUDA version {cuda_str_version}')
+building 'diff_gaussian_rasterization._C' extension
+Emitting ninja build file /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/build.ninja...
+Compiling objects...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+[1/2] c++ -MMD -MF /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/ext.o.d -pthread -B /environment/miniconda3/envs/megs/compiler_compat -Wno-unused-result -Wsign-compare -DNDEBUG -fwrapv -O2 -Wall -fPIC -O2 -isystem /environment/miniconda3/envs/megs/include -fPIC -O2 -isystem /environment/miniconda3/envs/megs/include -fPIC -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/TH -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/THC -I/environment/miniconda3/envs/megs/include -I/environment/miniconda3/envs/megs/include/python3.10 -c -c /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/ext.cpp -o /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/ext.o -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=1 -std=c++17
+FAILED: [code=1] /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/ext.o 
+c++ -MMD -MF /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/ext.o.d -pthread -B /environment/miniconda3/envs/megs/compiler_compat -Wno-unused-result -Wsign-compare -DNDEBUG -fwrapv -O2 -Wall -fPIC -O2 -isystem /environment/miniconda3/envs/megs/include -fPIC -O2 -isystem /environment/miniconda3/envs/megs/include -fPIC -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/TH -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/THC -I/environment/miniconda3/envs/megs/include -I/environment/miniconda3/envs/megs/include/python3.10 -c -c /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/ext.cpp -o /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/ext.o -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=1 -std=c++17
+In file included from /environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/api/include/torch/python.h:11,
+                 from /environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/extension.h:6,
+                 from /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/ext.cpp:12:
+/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/Exceptions.h:14:10: fatal error: pybind11/pybind11.h: No such file or directory
+   14 | #include <pybind11/pybind11.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+[2/2] /environment/miniconda3/envs/megs/bin/nvcc  -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/TH -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/THC -I/environment/miniconda3/envs/megs/include -I/environment/miniconda3/envs/megs/include/python3.10 -c -c /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/rasterize_points.cu -o /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/rasterize_points.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -I/home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/third_party/glm/ -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=1 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -std=c++17
+FAILED: [code=1] /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/rasterize_points.o 
+/environment/miniconda3/envs/megs/bin/nvcc  -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/TH -I/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/THC -I/environment/miniconda3/envs/megs/include -I/environment/miniconda3/envs/megs/include/python3.10 -c -c /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/rasterize_points.cu -o /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-310/rasterize_points.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -I/home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/third_party/glm/ -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=1 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -std=c++17
+In file included from /environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/api/include/torch/python.h:11,
+                 from /environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/extension.h:6,
+                 from /home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/rasterize_points.cu:13:
+/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/include/torch/csrc/Exceptions.h:14:10: fatal error: pybind11/pybind11.h: No such file or directory
+   14 | #include <pybind11/pybind11.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+Traceback (most recent call last):
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 1893, in _run_ninja_build
+    subprocess.run(
+  File "/environment/miniconda3/envs/megs/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['ninja', '-v']' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/featurize/work/3DGS_mac_new/submodules/diff-gaussian-rasterization/setup.py", line 17, in <module>
+    setup(
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/__init__.py", line 104, in setup
+    return distutils.core.setup(**attrs)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/core.py", line 184, in setup
+    return run_commands(dist)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/core.py", line 200, in run_commands
+    dist.run_commands()
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/dist.py", line 969, in run_commands
+    self.run_command(cmd)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/dist.py", line 967, in run_command
+    super().run_command(command)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/dist.py", line 988, in run_command
+    cmd_obj.run()
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/command/build_ext.py", line 91, in run
+    _build_ext.run(self)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/command/build_ext.py", line 359, in run
+    self.build_extensions()
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 843, in build_extensions
+    build_ext.build_extensions(self)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/command/build_ext.py", line 479, in build_extensions
+    self._build_extensions_serial()
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/command/build_ext.py", line 505, in _build_extensions_serial
+    self.build_extension(ext)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/command/build_ext.py", line 252, in build_extension
+    _build_ext.build_extension(self, ext)
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/setuptools/_distutils/command/build_ext.py", line 560, in build_extension
+    objects = self.compiler.compile(
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 658, in unix_wrap_ninja_compile
+    _write_ninja_file_and_compile_objects(
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 1574, in _write_ninja_file_and_compile_objects
+    _run_ninja_build(
+  File "/environment/miniconda3/envs/megs/lib/python3.10/site-packages/torch/utils/cpp_extension.py", line 1909, in _run_ninja_build
+    raise RuntimeError(message) from e
+RuntimeError: Error compiling objects for extension
