@@ -6,6 +6,7 @@ channels:
 dependencies:
   - cudatoolkit=11.6
   - plyfile
+  - pillow
   - python=3.7.13
   - pip=22.3.1
   - pytorch=1.12.1
