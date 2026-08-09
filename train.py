@@ -141,14 +141,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         bsr_debug = {"num_bsr_points": 0, "mean_distance": 0.0}
         bsr_weight = get_bsr_weight(iteration)
         if bsr_weight > 0.0 and gaussians.has_bernstein_surface:
-            bsr_mask = gaussians.get_bsr_mask(opt.bsr_z_percentile, opt.bsr_opacity_threshold)
+            bsr_weights = gaussians.get_bsr_soft_weights(
+                opt.bsr_z_percentile,
+                opt.bsr_opacity_threshold,
+                opt.bsr_z_softness,
+                opt.bsr_min_weight,
+            )
             Lbsr, bsr_debug = bernstein_surface_distance_loss(
                 gaussians.get_xyz,
                 gaussians.get_bernstein_control_points,
-                point_mask=bsr_mask,
+                point_weights=bsr_weights,
+                opacities=gaussians.get_opacity,
                 samples_u=opt.bsr_surface_samples_u,
                 samples_v=opt.bsr_surface_samples_v,
                 max_points=opt.bsr_max_points,
+                robust_delta=opt.bsr_robust_delta,
+                density_k=opt.bsr_density_k,
+                density_blend=opt.bsr_density_blend,
+                floater_lambda=opt.bsr_floater_lambda,
+                floater_margin=opt.bsr_floater_margin,
             )
             loss = loss + bsr_weight * Lbsr
 
@@ -193,6 +204,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 tb_writer.add_scalar("train_loss_patches/bsr_weight", bsr_weight, iteration)
                 tb_writer.add_scalar("train_loss_patches/bsr_num_points", bsr_debug["num_bsr_points"], iteration)
                 tb_writer.add_scalar("train_loss_patches/bsr_mean_distance", bsr_debug["mean_distance"], iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_surface_loss", bsr_debug.get("surface_loss", 0.0), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_floater_loss", bsr_debug.get("floater_loss", 0.0), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_mean_weight", bsr_debug.get("mean_weight", 0.0), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_mean_density_weight", bsr_debug.get("mean_density_weight", 0.0), iteration)
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)

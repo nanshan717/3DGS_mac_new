@@ -249,9 +249,13 @@ class GaussianModel:
 
         with torch.no_grad():
             xyz = self.get_xyz.detach()
-            x_min, y_min = xyz[:, :2].min(dim=0).values
-            x_max, y_max = xyz[:, :2].max(dim=0).values
             z_base = torch.quantile(xyz[:, 2], float(z_percentile))
+            lower_mask = xyz[:, 2] <= z_base
+            lower_xyz = xyz[lower_mask] if lower_mask.any() else xyz
+            x_min = torch.quantile(lower_xyz[:, 0], 0.01)
+            x_max = torch.quantile(lower_xyz[:, 0], 0.99)
+            y_min = torch.quantile(lower_xyz[:, 1], 0.01)
+            y_max = torch.quantile(lower_xyz[:, 1], 0.99)
 
             grid_x = torch.linspace(x_min, x_max, control_points_u, device=xyz.device, dtype=xyz.dtype)
             grid_y = torch.linspace(y_min, y_max, control_points_v, device=xyz.device, dtype=xyz.dtype)
@@ -261,14 +265,22 @@ class GaussianModel:
 
         self._bernstein_control_points = nn.Parameter(control_points.requires_grad_(True))
 
-    def get_bsr_mask(self, z_percentile=0.2, opacity_threshold=0.05):
+    def get_bsr_soft_weights(self, z_percentile=0.2, opacity_threshold=0.05, z_softness=0.04, min_weight=0.02):
         if self.get_xyz.numel() == 0:
-            return torch.empty(0, device="cuda", dtype=torch.bool)
+            return torch.empty(0, device="cuda")
         with torch.no_grad():
-            z_cutoff = torch.quantile(self.get_xyz.detach()[:, 2], float(z_percentile))
-            bottom_mask = self.get_xyz.detach()[:, 2] <= z_cutoff
-            opacity_mask = self.get_opacity.detach().squeeze(-1) >= float(opacity_threshold)
-            return torch.logical_and(bottom_mask, opacity_mask)
+            xyz = self.get_xyz.detach()
+            opacity = self.get_opacity.detach().squeeze(-1)
+            z_cutoff = torch.quantile(xyz[:, 2], float(z_percentile))
+            z_range = torch.quantile(xyz[:, 2], 0.95) - torch.quantile(xyz[:, 2], 0.05)
+            z_scale = torch.clamp(z_range * float(z_softness), min=1e-6)
+            z_weight = torch.sigmoid((z_cutoff - xyz[:, 2]) / z_scale)
+            op_weight = torch.clamp((opacity - float(opacity_threshold)) / max(1.0 - float(opacity_threshold), 1e-6), min=0.0, max=1.0)
+            weights = z_weight * op_weight
+            return torch.where(weights >= float(min_weight), weights, torch.zeros_like(weights))
+
+    def get_bsr_mask(self, z_percentile=0.2, opacity_threshold=0.05):
+        return self.get_bsr_soft_weights(z_percentile, opacity_threshold) > 0.0
 
     def update_learning_rate(self, iteration):
         ''' Learning rate scheduling per step '''

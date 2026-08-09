@@ -109,6 +109,13 @@ class OptimizationParams(ParamGroup):
         self.bsr_z_percentile = 0.2
         self.bsr_opacity_threshold = 0.05
         self.bsr_control_lr = 0.001
+        self.bsr_z_softness = 0.04
+        self.bsr_min_weight = 0.02
+        self.bsr_density_k = 8
+        self.bsr_density_blend = 0.5
+        self.bsr_robust_delta = 0.1
+        self.bsr_floater_lambda = 0.05
+        self.bsr_floater_margin = 0.0
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):
