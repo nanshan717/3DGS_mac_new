@@ -98,23 +98,23 @@ class OptimizationParams(ParamGroup):
         self.random_background = False
         self.optimizer_type = "default"
         self.use_bsr = False
-        self.bsr_lambda_max = 0.01
-        self.bsr_warmup_iters = 1000
-        self.bsr_ramp_iters = 3000
+        self.bsr_lambda_max = 0.003
+        self.bsr_warmup_iters = 10000
+        self.bsr_ramp_iters = 8000
         self.bsr_control_points_u = 5
         self.bsr_control_points_v = 5
         self.bsr_surface_samples_u = 32
         self.bsr_surface_samples_v = 32
         self.bsr_max_points = 4096
-        self.bsr_z_percentile = 0.2
-        self.bsr_opacity_threshold = 0.05
+        self.bsr_z_percentile = 0.15
+        self.bsr_opacity_threshold = 0.08
         self.bsr_control_lr = 0.001
-        self.bsr_z_softness = 0.04
+        self.bsr_z_softness = 0.025
         self.bsr_min_weight = 0.02
         self.bsr_density_k = 8
-        self.bsr_density_blend = 0.5
-        self.bsr_robust_delta = 0.1
-        self.bsr_floater_lambda = 0.05
+        self.bsr_density_blend = 0.3
+        self.bsr_robust_delta = 0.2
+        self.bsr_floater_lambda = 0.01
         self.bsr_floater_margin = 0.0
         super().__init__(parser, "Optimization Parameters")
 

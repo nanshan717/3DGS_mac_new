@@ -41,6 +41,19 @@ try:
 except:
     SPARSE_ADAM_AVAILABLE = False
 
+def normalize_cli_dashes(argv):
+    """Accept common Unicode dash variants pasted from rich text terminals."""
+    normalized = []
+    replacements = {"—": "--", "–": "--", "−": "-", "﹣": "-", "－": "-"}
+    for arg in argv:
+        if arg and arg[0] in replacements:
+            fixed = replacements[arg[0]] + arg[1:]
+            print(f"[CLI] Normalized argument {arg!r} -> {fixed!r}")
+            normalized.append(fixed)
+        else:
+            normalized.append(arg)
+    return normalized
+
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
 
     if not SPARSE_ADAM_AVAILABLE and opt.optimizer_type == "sparse_adam":
@@ -51,6 +64,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians = GaussianModel(dataset.sh_degree, opt.optimizer_type)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
+    if opt.use_bsr:
+        print(
+            "[BR-GS] Enabled with "
+            f"lambda={opt.bsr_lambda_max}, warmup={opt.bsr_warmup_iters}, ramp={opt.bsr_ramp_iters}, "
+            f"z_percentile={opt.bsr_z_percentile}, floater_lambda={opt.bsr_floater_lambda}"
+        )
+    else:
+        print("[BR-GS] Disabled: this run is vanilla 3DGS. Add --use_bsr to train BR-GS.")
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
         gaussians.restore(model_params, opt)
@@ -322,7 +343,7 @@ if __name__ == "__main__":
     parser.add_argument('--disable_viewer', action='store_true', default=False)
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
-    args = parser.parse_args(sys.argv[1:])
+    args = parser.parse_args(normalize_cli_dashes(sys.argv[1:]))
     args.save_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)
