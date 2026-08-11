@@ -155,7 +155,8 @@ def bernstein_surface_distance_loss(
             distances - 0.5 * delta,
         )
     else:
-        robust_values = torch.sqrt(min_dist_sq + 1e-6) - 1e-3
+        # robust_delta <= 0 restores the v1 squared-distance objective.
+        robust_values = min_dist_sq
 
     surface_loss = _weighted_mean(robust_values, weights)
     floater_loss = surface_loss * 0.0
