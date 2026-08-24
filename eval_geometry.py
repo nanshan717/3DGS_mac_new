@@ -22,7 +22,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -142,12 +142,18 @@ def fit_bernstein_height_surface(
     control_points_v: int,
     ridge: float,
     max_fit_points: int,
+    bounds: Optional[Tuple[float, float, float, float]] = None,
 ) -> Dict[str, np.ndarray]:
     u_axis, v_axis = horizontal_axes(axis_idx)
     fit_points = points[deterministic_sample_indices(points.shape[0], max_fit_points)]
 
-    u_norm, u_min, u_max = normalize_unit(fit_points[:, u_axis])
-    v_norm, v_min, v_max = normalize_unit(fit_points[:, v_axis])
+    if bounds is None:
+        u_norm, u_min, u_max = normalize_unit(fit_points[:, u_axis])
+        v_norm, v_min, v_max = normalize_unit(fit_points[:, v_axis])
+    else:
+        u_min, u_max, v_min, v_max = bounds
+        u_norm = np.clip((fit_points[:, u_axis] - u_min) / max(u_max - u_min, 1e-8), 0.0, 1.0)
+        v_norm = np.clip((fit_points[:, v_axis] - v_min) / max(v_max - v_min, 1e-8), 0.0, 1.0)
     heights = fit_points[:, axis_idx].astype(np.float32)
 
     basis_u = bernstein_basis(control_points_u, u_norm)
@@ -311,6 +317,152 @@ def compute_surface_variation(
     return float(np.mean(variations))
 
 
+def evaluate_piecewise_bottom(
+    bottom_points: np.ndarray,
+    axis_idx: int,
+    patches_u: int,
+    patches_v: int,
+    floater_tau_factor: float,
+    control_points_u: int,
+    control_points_v: int,
+    surface_samples_u: int,
+    surface_samples_v: int,
+    fit_ridge: float,
+    distance_chunk_size: int,
+    max_fit_points: int,
+    partition_bounds=None,
+    normalization_scale=None,
+) -> Dict[str, object]:
+    """Post-fit the same piecewise surface family to every compared model."""
+    patches_u, patches_v = max(1, patches_u), max(1, patches_v)
+    u_axis, v_axis = horizontal_axes(axis_idx)
+    if partition_bounds is None:
+        u_min, u_max = np.quantile(bottom_points[:, u_axis], [0.01, 0.99])
+        v_min, v_max = np.quantile(bottom_points[:, v_axis], [0.01, 0.99])
+    else:
+        u_min, u_max, v_min, v_max = partition_bounds
+    u_edges = np.linspace(u_min, u_max, patches_u + 1, dtype=np.float32)
+    v_edges = np.linspace(v_min, v_max, patches_v + 1, dtype=np.float32)
+    u_bin = np.clip(np.searchsorted(u_edges, bottom_points[:, u_axis], side="right") - 1, 0, patches_u - 1)
+    v_bin = np.clip(np.searchsorted(v_edges, bottom_points[:, v_axis], side="right") - 1, 0, patches_v - 1)
+
+    all_distances = []
+    patch_results = []
+    grids = {}
+    weighted_roughness = 0.0
+    evaluated_points = 0
+    for pu in range(patches_u):
+        for pv in range(patches_v):
+            mask = (u_bin == pu) & (v_bin == pv)
+            points = bottom_points[mask]
+            if points.shape[0] < max(3, control_points_u * control_points_v):
+                patch_results.append({"patch_u": pu, "patch_v": pv, "num_points": int(points.shape[0]), "valid": False})
+                continue
+            bounds = (float(u_edges[pu]), float(u_edges[pu + 1]), float(v_edges[pv]), float(v_edges[pv + 1]))
+            surface = fit_bernstein_height_surface(
+                points, axis_idx, control_points_u, control_points_v,
+                fit_ridge, max_fit_points, bounds=bounds,
+            )
+            surface_points = evaluate_bernstein_surface(surface, surface_samples_u, surface_samples_v)
+            dist = nearest_distances_to_surface(points, surface_points, distance_chunk_size)
+            diagonal = max(float(np.linalg.norm(np.array([bounds[1] - bounds[0], bounds[3] - bounds[2], np.ptp(points[:, axis_idx])]))), 1e-8)
+            normalized = dist / diagonal
+            spacing = estimate_spacing(points)
+            tau = floater_tau_factor * spacing if spacing > 0 else 0.0
+            roughness = bernstein_curvature_energy(surface["coeff"])
+            patch_results.append({
+                "patch_u": pu, "patch_v": pv, "num_points": int(points.shape[0]), "valid": True,
+                "bounds": list(bounds), "gsd": float(np.sqrt(np.mean(dist ** 2))),
+                "normalized_gsd": float(np.sqrt(np.mean(normalized ** 2))),
+                "distance_median": float(np.median(dist)), "distance_p90": float(np.quantile(dist, 0.90)),
+                "distance_p95": float(np.quantile(dist, 0.95)),
+                "floater_ratio": float(np.mean(dist > tau)) if tau > 0 else 0.0,
+                "floater_ratio_1pct": float(np.mean(normalized > 0.01)),
+                "floater_ratio_2pct": float(np.mean(normalized > 0.02)),
+                "floater_ratio_5pct": float(np.mean(normalized > 0.05)),
+                "roughness": float(roughness),
+            })
+            all_distances.append(dist)
+            weighted_roughness += roughness * points.shape[0]
+            evaluated_points += points.shape[0]
+            grids[(pu, pv)] = surface_points.reshape(surface_samples_u, surface_samples_v, 3)
+
+    if not all_distances:
+        raise RuntimeError("No valid piecewise Bernstein patch could be fitted.")
+    distances = np.concatenate(all_distances)
+    support_span = np.quantile(bottom_points, 0.99, axis=0) - np.quantile(bottom_points, 0.01, axis=0)
+    support_diagonal = max(float(normalization_scale) if normalization_scale is not None else float(np.linalg.norm(support_span)), 1e-8)
+    normalized = distances / support_diagonal
+    seam_position, seam_tangent = [], []
+    for pu in range(patches_u):
+        for pv in range(patches_v):
+            grid = grids.get((pu, pv))
+            if grid is None:
+                continue
+            right = grids.get((pu + 1, pv))
+            if right is not None:
+                seam_position.append(np.linalg.norm(grid[-1] - right[0], axis=1).mean())
+                seam_tangent.append(np.linalg.norm((grid[-1] - grid[-2]) - (right[1] - right[0]), axis=1).mean())
+            upper = grids.get((pu, pv + 1))
+            if upper is not None:
+                seam_position.append(np.linalg.norm(grid[:, -1] - upper[:, 0], axis=1).mean())
+                seam_tangent.append(np.linalg.norm((grid[:, -1] - grid[:, -2]) - (upper[:, 1] - upper[:, 0]), axis=1).mean())
+
+    return {
+        "metric_surface": f"postfit_bernstein_{patches_u}x{patches_v}",
+        "patches_u": patches_u, "patches_v": patches_v,
+        "num_evaluated_points": int(evaluated_points), "support_diagonal": support_diagonal,
+        "gsd": float(np.sqrt(np.mean(distances ** 2))),
+        "normalized_gsd": float(np.sqrt(np.mean(normalized ** 2))),
+        "distance_median": float(np.median(distances)),
+        "distance_p90": float(np.quantile(distances, 0.90)),
+        "distance_p95": float(np.quantile(distances, 0.95)),
+        "floater_ratio_1pct": float(np.mean(normalized > 0.01)),
+        "floater_ratio_2pct": float(np.mean(normalized > 0.02)),
+        "floater_ratio_5pct": float(np.mean(normalized > 0.05)),
+        "roughness": float(weighted_roughness / max(evaluated_points, 1)),
+        "toughness": float(1.0 / (1.0 + weighted_roughness / max(evaluated_points, 1))),
+        "seam_position_error": float(np.mean(seam_position)) if seam_position else 0.0,
+        "seam_tangent_error": float(np.mean(seam_tangent)) if seam_tangent else 0.0,
+        "patches": patch_results,
+    }
+
+
+def prepare_support_points(xyz: np.ndarray, axis: str, z_percentile: float, frame_override=None):
+    """Return evaluation-frame points, support subset, axis index, and frame metadata."""
+    eval_xyz = xyz
+    axis_idx = AXIS_TO_INDEX.get(axis.lower(), 2)
+    frame = None
+    if axis.lower() == "auto" and frame_override is not None:
+        frame = frame_override
+        eval_xyz = (xyz - frame["origin"][None, :]) @ frame["rotation"]
+        axis_idx = 2
+    elif axis.lower() == "auto":
+        initial_cutoff = np.quantile(xyz[:, 2], min(0.5, max(z_percentile * 2.0, 0.1)))
+        candidates = xyz[xyz[:, 2] <= initial_cutoff]
+        centered = candidates - candidates.mean(axis=0, keepdims=True)
+        _, _, vh = np.linalg.svd(centered, full_matrices=False)
+        normal = vh[-1]
+        if normal[2] < 0:
+            normal = -normal
+        normal = normal / (np.linalg.norm(normal) + 1e-12)
+        helper = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        if abs(float(helper @ normal)) > 0.9:
+            helper = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        frame_u = np.cross(normal, helper)
+        frame_u /= np.linalg.norm(frame_u) + 1e-12
+        frame_v = np.cross(normal, frame_u)
+        origin = xyz.mean(axis=0)
+        rotation = np.stack((frame_u, frame_v, normal), axis=1)
+        eval_xyz = (xyz - origin[None, :]) @ rotation
+        axis_idx = 2
+        frame = {"origin": origin, "rotation": rotation}
+    support_values = eval_xyz[:, axis_idx]
+    support_cutoff = float(np.quantile(support_values, z_percentile))
+    bottom_points = eval_xyz[support_values <= support_cutoff]
+    return eval_xyz, bottom_points, axis_idx, frame
+
+
 def evaluate_single_model(
     model_path: Path,
     iteration: int,
@@ -327,37 +479,12 @@ def evaluate_single_model(
     max_query_points: int,
     max_fit_points: int,
     ground_truth_ply: str = "",
+    support_frame=None,
 ) -> Dict[str, float]:
     ply_path, resolved_iteration = resolve_ply_path(model_path, iteration)
     xyz = load_xyz_from_ply(ply_path)
 
-    eval_xyz = xyz
-    axis_idx = AXIS_TO_INDEX.get(axis.lower(), 2)
-    if axis.lower() == "auto":
-        # Match BR-GS v3's deterministic support-frame initialization and
-        # evaluate in that orthonormal frame.
-        initial_cutoff = np.quantile(xyz[:, 2], min(0.5, max(z_percentile * 2.0, 0.1)))
-        candidates = xyz[xyz[:, 2] <= initial_cutoff]
-        centered = candidates - candidates.mean(axis=0, keepdims=True)
-        _, _, vh = np.linalg.svd(centered, full_matrices=False)
-        normal = vh[-1]
-        if normal[2] < 0:
-            normal = -normal
-        normal = normal / (np.linalg.norm(normal) + 1e-12)
-        helper = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        if abs(float(helper @ normal)) > 0.9:
-            helper = np.array([0.0, 1.0, 0.0], dtype=np.float32)
-        frame_u = np.cross(normal, helper)
-        frame_u /= np.linalg.norm(frame_u) + 1e-12
-        frame_v = np.cross(normal, frame_u)
-        origin = xyz.mean(axis=0)
-        eval_xyz = (xyz - origin[None, :]) @ np.stack((frame_u, frame_v, normal), axis=1)
-        axis_idx = 2
-
-    support_values = eval_xyz[:, axis_idx]
-    support_cutoff = float(np.quantile(support_values, z_percentile))
-    bottom_mask = support_values <= support_cutoff
-    bottom_points = eval_xyz[bottom_mask]
+    eval_xyz, bottom_points, axis_idx, frame = prepare_support_points(xyz, axis, z_percentile, support_frame)
 
     if bottom_points.shape[0] < 3:
         raise RuntimeError(
@@ -437,8 +564,8 @@ def evaluate_single_model(
     if ground_truth_ply:
         gt_path = Path(ground_truth_ply).expanduser().resolve()
         gt_points = load_xyz_from_ply(gt_path)
-        if axis.lower() == "auto":
-            gt_points = (gt_points - origin[None, :]) @ np.stack((frame_u, frame_v, normal), axis=1)
+        if frame is not None:
+            gt_points = (gt_points - frame["origin"][None, :]) @ frame["rotation"]
         pred_to_gt = nearest_distances_to_surface(bottom_points, gt_points, distance_chunk_size)
         gt_to_pred = nearest_distances_to_surface(gt_points, bottom_points, distance_chunk_size)
         gt_span = np.quantile(gt_points, 0.99, axis=0) - np.quantile(gt_points, 0.01, axis=0)
@@ -480,6 +607,17 @@ def print_result(result: Dict[str, float]) -> None:
         print(f"GT Accuracy/Completeness: {result['gt_accuracy']:.6f} / {result['gt_completeness']:.6f}")
         print(f"GT Chamfer L1/L2       : {result['gt_chamfer_l1']:.6f} / {result['gt_chamfer_l2']:.6f}")
         print(f"GT F-score @1/2/5%     : {result['gt_fscore_1pct']:.6f} / {result['gt_fscore_2pct']:.6f} / {result['gt_fscore_5pct']:.6f}")
+    print("")
+
+
+def print_piecewise_result(result: Dict[str, object]) -> None:
+    print(f"Piecewise surface : {result['metric_surface']}")
+    print(f"Evaluated points  : {result['num_evaluated_points']}")
+    print(f"GSD / normalized : {result['gsd']:.6f} / {result['normalized_gsd']:.6f}")
+    print(f"Distance P50/P90/P95: {result['distance_median']:.6f} / {result['distance_p90']:.6f} / {result['distance_p95']:.6f}")
+    print(f"Floater @1/2/5% span: {result['floater_ratio_1pct']:.6f} / {result['floater_ratio_2pct']:.6f} / {result['floater_ratio_5pct']:.6f}")
+    print(f"Roughness         : {result['roughness']:.6f}")
+    print(f"Seam position/tangent: {result['seam_position_error']:.6f} / {result['seam_tangent_error']:.6f}")
     print("")
 
 
@@ -580,6 +718,8 @@ def main() -> None:
         default="",
         help="Optional dense fabric ground-truth point-cloud PLY for Accuracy/Completeness/Chamfer/F-score metrics.",
     )
+    parser.add_argument("--eval_patches_u", type=int, default=2, help="Piecewise post-fit patch count on support u.")
+    parser.add_argument("--eval_patches_v", type=int, default=2, help="Piecewise post-fit patch count on support v.")
     args = parser.parse_args()
 
     for model_path_str in args.model_paths:
@@ -603,11 +743,42 @@ def main() -> None:
         )
         print_result(result)
 
+        ply_path = Path(result["ply_path"])
+        xyz = load_xyz_from_ply(ply_path)
+        _, bottom_points, axis_idx, _ = prepare_support_points(xyz, args.axis, args.z_percentile)
+        piecewise = evaluate_piecewise_bottom(
+            bottom_points=bottom_points,
+            axis_idx=axis_idx,
+            patches_u=args.eval_patches_u,
+            patches_v=args.eval_patches_v,
+            floater_tau_factor=args.floater_tau_factor,
+            control_points_u=args.control_points_u,
+            control_points_v=args.control_points_v,
+            surface_samples_u=args.surface_samples_u,
+            surface_samples_v=args.surface_samples_v,
+            fit_ridge=args.fit_ridge,
+            distance_chunk_size=args.distance_chunk_size,
+            max_fit_points=args.max_fit_points,
+        )
+        print_piecewise_result(piecewise)
+
         if args.save_json:
-            out_path = model_path / "geometry_results.json"
-            with open(out_path, "w", encoding="utf-8") as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
-            print(f"Saved: {out_path}")
+            axis_tag = args.axis.lower()
+            patch_tag = f"{args.eval_patches_u}x{args.eval_patches_v}"
+            global_path = model_path / f"geometry_results_axis-{axis_tag}_global-1x1.json"
+            piecewise_path = model_path / f"geometry_results_axis-{axis_tag}_piecewise-{patch_tag}.json"
+            summary_path = model_path / f"geometry_results_axis-{axis_tag}_summary-{patch_tag}.json"
+            summary = {
+                "schema": "brgs-geometry-v2",
+                "model_path": str(model_path),
+                "axis": args.axis,
+                "global_1x1": result,
+                f"piecewise_{patch_tag}": piecewise,
+            }
+            for out_path, payload in ((global_path, result), (piecewise_path, piecewise), (summary_path, summary)):
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2, ensure_ascii=False)
+                print(f"Saved: {out_path}")
 
 
 if __name__ == "__main__":

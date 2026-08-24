@@ -11,10 +11,10 @@ python train.py -s /path/to/scene -m output/scene_3dgs --eval -r 4
 Recommended target-domain BR-GS v3:
 
 ```bash
-python train.py -s /path/to/scene -m output/scene_brgs_v3 --eval -r 4 --bsr_v3
-python render.py -m output/scene_brgs_v3
-python metrics.py -m output/scene_brgs_v3
-python eval_geometry.py -m output/scene_brgs_v3 --axis auto --save_json
+python train.py -s /path/to/scene -m output/scene_brgs_v3_seed0 --eval -r 4 --bsr_v3 --seed 0
+python render.py -m output/scene_brgs_v3_seed0
+python metrics.py -m output/scene_brgs_v3_seed0
+python eval_geometry.py -m output/scene_brgs_v3_seed0 --axis auto --eval_patches_u 2 --eval_patches_v 2 --save_json
 ```
 
 For annotated fabric regions, store masks using the source image filename or stem under
@@ -27,6 +27,25 @@ For annotated fabric regions, store masks using the source image filename or ste
 Every run writes `experiment_manifest.json` with resolved dataset, optimizer, pipeline,
 software, and command-line settings. Do not compare runs unless their dataset split,
 resolution, seed, and evaluation settings match.
+
+Use `--seed 0`, `--seed 1`, and `--seed 2` for repeated runs. `--deterministic` also
+configures cuDNN determinism, but custom CUDA rasterization may still prevent bitwise
+reproducibility; report these as seeded repeated runs.
+
+Geometry evaluation now writes separate non-overwriting global, piecewise, and summary
+JSON files. The comparison tool uses its first model as the shared support-frame,
+partition-boundary, and normalization-scale reference, so list the baseline first.
+Compare multiple repositories/models through the same implementation with:
+
+```bash
+python compare_experiments.py \
+  --models \
+    official_3dgs=/absolute/path/to/official/output/flowers_3dgs \
+    internal_vanilla=/absolute/path/to/3DGS_mac_new/output/flowers_internal_vanilla \
+    brgs_v3=/absolute/path/to/3DGS_mac_new/output/flowers_brgs_v3 \
+  --axis auto --eval_patches_u 2 --eval_patches_v 2 \
+  --output_dir comparisons --name flowers_seed0
+```
 
 ## Frozen ablation order
 
@@ -60,4 +79,3 @@ The legacy spacing-based floater ratio is retained only for reproduction. Primar
 geometry reporting should use normalized GSD, P50/P90/P95 distance, floater ratios at
 1/2/5 percent of support-region span, local surface variation, and—when ground truth is
 available—Chamfer distance, F-score, normal consistency, and fabric-only depth RMSE.
-
