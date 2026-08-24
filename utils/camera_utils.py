@@ -14,11 +14,24 @@ import numpy as np
 from utils.graphics_utils import fov2focal
 from PIL import Image
 import cv2
+import os
 
 WARNED = False
 
 def loadCam(args, id, cam_info, resolution_scale, is_nerf_synthetic, is_test_dataset):
     image = Image.open(cam_info.image_path)
+    roi_mask = None
+    if getattr(args, "bsr_roi_dir", ""):
+        roi_root = args.bsr_roi_dir
+        if not os.path.isabs(roi_root):
+            roi_root = os.path.join(args.source_path, roi_root)
+        stem = os.path.splitext(cam_info.image_name)[0]
+        candidates = [os.path.join(roi_root, cam_info.image_name)]
+        candidates.extend(os.path.join(roi_root, stem + extension) for extension in (".png", ".jpg", ".jpeg"))
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                roi_mask = Image.open(candidate)
+                break
 
     if cam_info.depth_path != "":
         try:
@@ -64,7 +77,8 @@ def loadCam(args, id, cam_info, resolution_scale, is_nerf_synthetic, is_test_dat
                   FoVx=cam_info.FovX, FoVy=cam_info.FovY, depth_params=cam_info.depth_params,
                   image=image, invdepthmap=invdepthmap,
                   image_name=cam_info.image_name, uid=id, data_device=args.data_device,
-                  train_test_exp=args.train_test_exp, is_test_dataset=is_test_dataset, is_test_view=cam_info.is_test)
+                  train_test_exp=args.train_test_exp, is_test_dataset=is_test_dataset,
+                  is_test_view=cam_info.is_test, roi_mask=roi_mask)
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args, is_nerf_synthetic, is_test_dataset):
     camera_list = []

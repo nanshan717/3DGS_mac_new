@@ -326,15 +326,38 @@ def evaluate_single_model(
     roughness_k: int,
     max_query_points: int,
     max_fit_points: int,
+    ground_truth_ply: str = "",
 ) -> Dict[str, float]:
     ply_path, resolved_iteration = resolve_ply_path(model_path, iteration)
     xyz = load_xyz_from_ply(ply_path)
 
-    axis_idx = AXIS_TO_INDEX[axis.lower()]
-    support_values = xyz[:, axis_idx]
+    eval_xyz = xyz
+    axis_idx = AXIS_TO_INDEX.get(axis.lower(), 2)
+    if axis.lower() == "auto":
+        # Match BR-GS v3's deterministic support-frame initialization and
+        # evaluate in that orthonormal frame.
+        initial_cutoff = np.quantile(xyz[:, 2], min(0.5, max(z_percentile * 2.0, 0.1)))
+        candidates = xyz[xyz[:, 2] <= initial_cutoff]
+        centered = candidates - candidates.mean(axis=0, keepdims=True)
+        _, _, vh = np.linalg.svd(centered, full_matrices=False)
+        normal = vh[-1]
+        if normal[2] < 0:
+            normal = -normal
+        normal = normal / (np.linalg.norm(normal) + 1e-12)
+        helper = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        if abs(float(helper @ normal)) > 0.9:
+            helper = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        frame_u = np.cross(normal, helper)
+        frame_u /= np.linalg.norm(frame_u) + 1e-12
+        frame_v = np.cross(normal, frame_u)
+        origin = xyz.mean(axis=0)
+        eval_xyz = (xyz - origin[None, :]) @ np.stack((frame_u, frame_v, normal), axis=1)
+        axis_idx = 2
+
+    support_values = eval_xyz[:, axis_idx]
     support_cutoff = float(np.quantile(support_values, z_percentile))
     bottom_mask = support_values <= support_cutoff
-    bottom_points = xyz[bottom_mask]
+    bottom_points = eval_xyz[bottom_mask]
 
     if bottom_points.shape[0] < 3:
         raise RuntimeError(
@@ -359,6 +382,9 @@ def evaluate_single_model(
     tau = floater_tau_factor * spacing if spacing > 0 else 0.0
     floater_ratio = float(np.mean(dist > tau)) if tau > 0 else 0.0
     gsd = float(np.sqrt(np.mean(dist ** 2)))
+    support_span = np.quantile(bottom_points, 0.99, axis=0) - np.quantile(bottom_points, 0.01, axis=0)
+    support_diagonal = float(np.linalg.norm(support_span))
+    normalized_dist = dist / max(support_diagonal, 1e-8)
 
     local_variation = compute_surface_variation(
         bottom_points,
@@ -394,12 +420,45 @@ def evaluate_single_model(
         "spacing_median": float(spacing),
         "floater_ratio": floater_ratio,
         "gsd": gsd,
+        "normalized_gsd": float(np.sqrt(np.mean(normalized_dist ** 2))),
+        "distance_median": float(np.median(dist)),
+        "distance_p90": float(np.quantile(dist, 0.90)),
+        "distance_p95": float(np.quantile(dist, 0.95)),
+        "support_diagonal": support_diagonal,
+        "floater_ratio_1pct": float(np.mean(normalized_dist > 0.01)),
+        "floater_ratio_2pct": float(np.mean(normalized_dist > 0.02)),
+        "floater_ratio_5pct": float(np.mean(normalized_dist > 0.05)),
         "roughness": float(roughness),
         "toughness": toughness,
         "local_surface_variation": float(local_variation),
         "plane_floater_ratio": plane_floater_ratio,
         "plane_gsd": plane_gsd,
     }
+    if ground_truth_ply:
+        gt_path = Path(ground_truth_ply).expanduser().resolve()
+        gt_points = load_xyz_from_ply(gt_path)
+        if axis.lower() == "auto":
+            gt_points = (gt_points - origin[None, :]) @ np.stack((frame_u, frame_v, normal), axis=1)
+        pred_to_gt = nearest_distances_to_surface(bottom_points, gt_points, distance_chunk_size)
+        gt_to_pred = nearest_distances_to_surface(gt_points, bottom_points, distance_chunk_size)
+        gt_span = np.quantile(gt_points, 0.99, axis=0) - np.quantile(gt_points, 0.01, axis=0)
+        gt_diagonal = max(float(np.linalg.norm(gt_span)), 1e-8)
+        result.update({
+            "ground_truth_ply": str(gt_path),
+            "gt_accuracy": float(pred_to_gt.mean()),
+            "gt_completeness": float(gt_to_pred.mean()),
+            "gt_chamfer_l1": float(0.5 * (pred_to_gt.mean() + gt_to_pred.mean())),
+            "gt_chamfer_l2": float(0.5 * ((pred_to_gt ** 2).mean() + (gt_to_pred ** 2).mean())),
+        })
+        for fraction in (0.01, 0.02, 0.05):
+            threshold = fraction * gt_diagonal
+            precision = float(np.mean(pred_to_gt <= threshold))
+            recall = float(np.mean(gt_to_pred <= threshold))
+            fscore = 2.0 * precision * recall / max(precision + recall, 1e-12)
+            tag = int(fraction * 100)
+            result[f"gt_precision_{tag}pct"] = precision
+            result[f"gt_recall_{tag}pct"] = recall
+            result[f"gt_fscore_{tag}pct"] = fscore
     return result
 
 
@@ -411,9 +470,16 @@ def print_result(result: Dict[str, float]) -> None:
     print(f"Points  : {result['num_points']}  |  Bottom slice: {result['num_bottom_points']}")
     print(f"Floater Ratio : {result['floater_ratio']:.6f}")
     print(f"GSD           : {result['gsd']:.6f}")
+    print(f"Normalized GSD: {result['normalized_gsd']:.6f}")
+    print(f"Distance P50/P90/P95: {result['distance_median']:.6f} / {result['distance_p90']:.6f} / {result['distance_p95']:.6f}")
+    print(f"Floater @1/2/5% span: {result['floater_ratio_1pct']:.6f} / {result['floater_ratio_2pct']:.6f} / {result['floater_ratio_5pct']:.6f}")
     print(f"Roughness     : {result['roughness']:.6f}   (Bernstein curvature energy)")
     print(f"Toughness     : {result['toughness']:.6f}   (1 / (1 + roughness))")
     print(f"Plane GSD     : {result['plane_gsd']:.6f}   (diagnostic only)")
+    if "gt_chamfer_l1" in result:
+        print(f"GT Accuracy/Completeness: {result['gt_accuracy']:.6f} / {result['gt_completeness']:.6f}")
+        print(f"GT Chamfer L1/L2       : {result['gt_chamfer_l1']:.6f} / {result['gt_chamfer_l2']:.6f}")
+        print(f"GT F-score @1/2/5%     : {result['gt_fscore_1pct']:.6f} / {result['gt_fscore_2pct']:.6f} / {result['gt_fscore_5pct']:.6f}")
     print("")
 
 
@@ -434,7 +500,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--axis",
-        choices=["x", "y", "z"],
+        choices=["x", "y", "z", "auto"],
         default="z",
         help="Axis used for the bottom-slice filter.",
     )
@@ -509,6 +575,11 @@ def main() -> None:
         action="store_true",
         help="Save geometry_results.json under each model path.",
     )
+    parser.add_argument(
+        "--ground_truth_ply",
+        default="",
+        help="Optional dense fabric ground-truth point-cloud PLY for Accuracy/Completeness/Chamfer/F-score metrics.",
+    )
     args = parser.parse_args()
 
     for model_path_str in args.model_paths:
@@ -528,6 +599,7 @@ def main() -> None:
             roughness_k=args.roughness_k,
             max_query_points=args.max_query_points,
             max_fit_points=args.max_fit_points,
+            ground_truth_ply=args.ground_truth_ply,
         )
         print_result(result)
 

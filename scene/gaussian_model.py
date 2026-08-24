@@ -65,6 +65,12 @@ class GaussianModel:
         self.percent_dense = 0
         self.spatial_lr_scale = 0
         self._bernstein_control_points = torch.empty(0)
+        self._bsr_frame_origin = torch.empty(0)
+        self._bsr_frame_u = torch.empty(0)
+        self._bsr_frame_v = torch.empty(0)
+        self._bsr_frame_normal = torch.empty(0)
+        self._bsr_support_scale = torch.tensor(1.0)
+        self._bsr_height_hook = None
         self.setup_functions()
 
     def capture(self):
@@ -83,6 +89,7 @@ class GaussianModel:
             self.spatial_lr_scale,
             self._bernstein_control_points,
             self.bernstein_optimizer.state_dict() if self.bernstein_optimizer is not None else None,
+            self.get_bsr_metadata(),
         )
     
     def restore(self, model_args, training_args):
@@ -100,6 +107,8 @@ class GaussianModel:
         self.spatial_lr_scale) = model_args[:12]
         if len(model_args) > 12 and model_args[12].numel() > 0:
             self._bernstein_control_points = nn.Parameter(model_args[12].detach().cuda().requires_grad_(True))
+        if len(model_args) > 14 and model_args[14] is not None:
+            self.set_bsr_metadata(model_args[14])
         self.training_setup(training_args)
         self.xyz_gradient_accum = xyz_gradient_accum
         self.denom = denom
@@ -148,6 +157,27 @@ class GaussianModel:
     @property
     def has_bernstein_surface(self):
         return isinstance(self._bernstein_control_points, nn.Parameter) and self._bernstein_control_points.numel() > 0
+
+    def get_bsr_metadata(self):
+        if self._bsr_frame_normal.numel() == 0:
+            return None
+        return {
+            "origin": self._bsr_frame_origin.detach().cpu(),
+            "u": self._bsr_frame_u.detach().cpu(),
+            "v": self._bsr_frame_v.detach().cpu(),
+            "normal": self._bsr_frame_normal.detach().cpu(),
+            "support_scale": float(self._bsr_support_scale.detach().cpu()),
+        }
+
+    def set_bsr_metadata(self, metadata):
+        if not metadata:
+            return
+        device = self.get_xyz.device
+        self._bsr_frame_origin = metadata["origin"].to(device)
+        self._bsr_frame_u = metadata["u"].to(device)
+        self._bsr_frame_v = metadata["v"].to(device)
+        self._bsr_frame_normal = metadata["normal"].to(device)
+        self._bsr_support_scale = torch.tensor(float(metadata["support_scale"]), device=device)
 
     def get_exposure_from_name(self, image_name):
         if self.pretrained_exposures is None:
@@ -231,7 +261,15 @@ class GaussianModel:
                 training_args.bsr_control_points_u,
                 training_args.bsr_control_points_v,
                 training_args.bsr_z_percentile,
+                training_args.bsr_axis_mode,
+                training_args.bsr_num_patches_u,
+                training_args.bsr_num_patches_v,
             )
+            if training_args.bsr_height_only and self._bsr_frame_normal.numel() == 3:
+                normal = self._bsr_frame_normal.detach().clone()
+                self._bsr_height_hook = self._bernstein_control_points.register_hook(
+                    lambda grad: (grad * normal).sum(dim=-1, keepdim=True) * normal
+                )
             self.bernstein_optimizer = torch.optim.Adam(
                 [self._bernstein_control_points],
                 lr=training_args.bsr_control_lr,
@@ -240,7 +278,8 @@ class GaussianModel:
         else:
             self.bernstein_optimizer = None
 
-    def initialize_bernstein_surface(self, control_points_u, control_points_v, z_percentile):
+    def initialize_bernstein_surface(self, control_points_u, control_points_v, z_percentile,
+                                     axis_mode="z", num_patches_u=1, num_patches_v=1):
         if self.has_bernstein_surface:
             return
         if self.get_xyz.numel() == 0:
@@ -249,19 +288,61 @@ class GaussianModel:
 
         with torch.no_grad():
             xyz = self.get_xyz.detach()
-            z_base = torch.quantile(xyz[:, 2], float(z_percentile))
-            lower_mask = xyz[:, 2] <= z_base
+            normal = torch.tensor([0.0, 0.0, 1.0], device=xyz.device, dtype=xyz.dtype)
+            if axis_mode == "x":
+                normal = torch.tensor([1.0, 0.0, 0.0], device=xyz.device, dtype=xyz.dtype)
+            elif axis_mode == "y":
+                normal = torch.tensor([0.0, 1.0, 0.0], device=xyz.device, dtype=xyz.dtype)
+            elif axis_mode == "auto":
+                # Robustly initialize from the low-z support candidates. The sign is
+                # fixed against +z so that "lower" keeps a deterministic meaning.
+                z0 = torch.quantile(xyz[:, 2], min(0.5, max(float(z_percentile) * 2.0, 0.1)))
+                candidates = xyz[xyz[:, 2] <= z0]
+                if candidates.shape[0] >= 3:
+                    centered = candidates - candidates.mean(dim=0, keepdim=True)
+                    covariance = centered.T @ centered / max(candidates.shape[0] - 1, 1)
+                    _, eigenvectors = torch.linalg.eigh(covariance)
+                    normal = eigenvectors[:, 0]
+                    if normal[2] < 0:
+                        normal = -normal
+            normal = normal / normal.norm().clamp_min(1e-8)
+            helper = torch.tensor([1.0, 0.0, 0.0], device=xyz.device, dtype=xyz.dtype)
+            if torch.abs(torch.dot(helper, normal)) > 0.9:
+                helper = torch.tensor([0.0, 1.0, 0.0], device=xyz.device, dtype=xyz.dtype)
+            axis_u = torch.cross(normal, helper, dim=0)
+            axis_u = axis_u / axis_u.norm().clamp_min(1e-8)
+            axis_v = torch.cross(normal, axis_u, dim=0)
+            axis_v = axis_v / axis_v.norm().clamp_min(1e-8)
+            origin = xyz.mean(dim=0)
+            height = (xyz - origin) @ normal
+            height_base = torch.quantile(height, float(z_percentile))
+            lower_mask = height <= height_base
             lower_xyz = xyz[lower_mask] if lower_mask.any() else xyz
-            x_min = torch.quantile(lower_xyz[:, 0], 0.01)
-            x_max = torch.quantile(lower_xyz[:, 0], 0.99)
-            y_min = torch.quantile(lower_xyz[:, 1], 0.01)
-            y_max = torch.quantile(lower_xyz[:, 1], 0.99)
-
-            grid_x = torch.linspace(x_min, x_max, control_points_u, device=xyz.device, dtype=xyz.dtype)
-            grid_y = torch.linspace(y_min, y_max, control_points_v, device=xyz.device, dtype=xyz.dtype)
-            mesh_x, mesh_y = torch.meshgrid(grid_x, grid_y, indexing="ij")
-            mesh_z = torch.full_like(mesh_x, z_base)
-            control_points = torch.stack((mesh_x, mesh_y, mesh_z), dim=-1)
+            rel = lower_xyz - origin
+            coord_u, coord_v = rel @ axis_u, rel @ axis_v
+            u_min, u_max = torch.quantile(coord_u, 0.01), torch.quantile(coord_u, 0.99)
+            v_min, v_max = torch.quantile(coord_v, 0.01), torch.quantile(coord_v, 0.99)
+            patches = []
+            for pu in range(max(1, int(num_patches_u))):
+                row = []
+                ua = u_min + (u_max - u_min) * pu / max(1, int(num_patches_u))
+                ub = u_min + (u_max - u_min) * (pu + 1) / max(1, int(num_patches_u))
+                for pv in range(max(1, int(num_patches_v))):
+                    va = v_min + (v_max - v_min) * pv / max(1, int(num_patches_v))
+                    vb = v_min + (v_max - v_min) * (pv + 1) / max(1, int(num_patches_v))
+                    gu = torch.linspace(ua, ub, control_points_u, device=xyz.device, dtype=xyz.dtype)
+                    gv = torch.linspace(va, vb, control_points_v, device=xyz.device, dtype=xyz.dtype)
+                    mesh_u, mesh_v = torch.meshgrid(gu, gv, indexing="ij")
+                    cp = origin + mesh_u[..., None] * axis_u + mesh_v[..., None] * axis_v
+                    cp = cp + height_base * normal
+                    row.append(cp)
+                patches.append(torch.stack(row, dim=0))
+            control_points = torch.stack(patches, dim=0)
+            self._bsr_frame_origin = origin
+            self._bsr_frame_u = axis_u
+            self._bsr_frame_v = axis_v
+            self._bsr_frame_normal = normal
+            self._bsr_support_scale = torch.sqrt((u_max-u_min).square() + (v_max-v_min).square()).clamp_min(1e-6)
 
         self._bernstein_control_points = nn.Parameter(control_points.requires_grad_(True))
 
@@ -271,12 +352,30 @@ class GaussianModel:
         with torch.no_grad():
             xyz = self.get_xyz.detach()
             opacity = self.get_opacity.detach().squeeze(-1)
-            z_cutoff = torch.quantile(xyz[:, 2], float(z_percentile))
-            z_range = torch.quantile(xyz[:, 2], 0.95) - torch.quantile(xyz[:, 2], 0.05)
+            heights = xyz[:, 2]
+            if self._bsr_frame_normal.numel() == 3:
+                heights = (xyz - self._bsr_frame_origin) @ self._bsr_frame_normal
+            z_cutoff = torch.quantile(heights, float(z_percentile))
+            z_range = torch.quantile(heights, 0.95) - torch.quantile(heights, 0.05)
             z_scale = torch.clamp(z_range * float(z_softness), min=1e-6)
-            z_weight = torch.sigmoid((z_cutoff - xyz[:, 2]) / z_scale)
+            z_weight = torch.sigmoid((z_cutoff - heights) / z_scale)
             op_weight = torch.clamp((opacity - float(opacity_threshold)) / max(1.0 - float(opacity_threshold), 1e-6), min=0.0, max=1.0)
             weights = z_weight * op_weight
+            return torch.where(weights >= float(min_weight), weights, torch.zeros_like(weights))
+
+    def get_bsr_height_weights(self, z_percentile=0.2, z_softness=0.04, min_weight=0.02):
+        """Near-support confidence without opacity gating, used for floater suppression."""
+        if self.get_xyz.numel() == 0:
+            return torch.empty(0, device="cuda")
+        with torch.no_grad():
+            xyz = self.get_xyz.detach()
+            heights = xyz[:, 2]
+            if self._bsr_frame_normal.numel() == 3:
+                heights = (xyz - self._bsr_frame_origin) @ self._bsr_frame_normal
+            cutoff = torch.quantile(heights, float(z_percentile))
+            height_range = torch.quantile(heights, 0.95) - torch.quantile(heights, 0.05)
+            scale = torch.clamp(height_range * float(z_softness), min=1e-6)
+            weights = torch.sigmoid((cutoff - heights) / scale)
             return torch.where(weights >= float(min_weight), weights, torch.zeros_like(weights))
 
     def get_bsr_mask(self, z_percentile=0.2, opacity_threshold=0.05):
@@ -332,7 +431,8 @@ class GaussianModel:
         if not self.has_bernstein_surface:
             return
         torch.save(
-            {"control_points": self._bernstein_control_points.detach().cpu()},
+            {"control_points": self._bernstein_control_points.detach().cpu(),
+             "metadata": self.get_bsr_metadata()},
             path,
         )
 

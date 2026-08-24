@@ -56,6 +56,8 @@ class ModelParams(ParamGroup):
         self.train_test_exp = False
         self.data_device = "cuda"
         self.eval = False
+        self.bsr_roi_dir = ""
+        self.bsr_roi_required = False
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -116,6 +118,20 @@ class OptimizationParams(ParamGroup):
         self.bsr_robust_delta = 0.0
         self.bsr_floater_lambda = 0.0
         self.bsr_floater_margin = 0.0
+        # BR-GS v3 options. Defaults keep legacy BR-GS behavior reproducible;
+        # use --bsr_v3 to enable the recommended final configuration in train.py.
+        self.bsr_v3 = False
+        self.bsr_axis_mode = "z"
+        self.bsr_num_patches_u = 1
+        self.bsr_num_patches_v = 1
+        self.bsr_height_only = False
+        self.bsr_normalize_distance = False
+        self.bsr_coverage_lambda = 0.0
+        self.bsr_control_smoothness_lambda = 0.0
+        self.bsr_patch_continuity_lambda = 0.0
+        self.bsr_spatial_sampling = False
+        self.bsr_refine_start = -1
+        self.bsr_refine_end = -1
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

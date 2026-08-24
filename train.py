@@ -19,6 +19,8 @@ import sys
 from scene import Scene, GaussianModel
 from utils.general_utils import safe_state, get_expon_lr_func
 import uuid
+import json
+import torch.nn.functional as F
 from tqdm import tqdm
 from utils.image_utils import psnr
 from argparse import ArgumentParser, Namespace
@@ -61,6 +63,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
+    write_experiment_manifest(dataset.model_path, dataset, opt, pipe)
     gaussians = GaussianModel(dataset.sh_degree, opt.optimizer_type)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
@@ -99,7 +102,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         if opt.bsr_ramp_iters <= 0:
             return opt.bsr_lambda_max
         ramp_progress = min(1.0, (iteration - opt.bsr_warmup_iters) / float(opt.bsr_ramp_iters))
-        return opt.bsr_lambda_max * ramp_progress
+        weight = opt.bsr_lambda_max * ramp_progress
+        if opt.bsr_refine_end > 0 and iteration > opt.bsr_refine_end:
+            tail = max(1, opt.iterations - opt.bsr_refine_end)
+            progress = min(1.0, (iteration - opt.bsr_refine_end) / float(tail))
+            weight *= (1.0 - 0.5 * progress)
+        return weight
 
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
@@ -162,12 +170,23 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         bsr_debug = {"num_bsr_points": 0, "mean_distance": 0.0}
         bsr_weight = get_bsr_weight(iteration)
         if bsr_weight > 0.0 and gaussians.has_bernstein_surface:
+            refinement_active = opt.bsr_refine_start < 0 or iteration >= opt.bsr_refine_start
             bsr_weights = gaussians.get_bsr_soft_weights(
                 opt.bsr_z_percentile,
                 opt.bsr_opacity_threshold,
                 opt.bsr_z_softness,
                 opt.bsr_min_weight,
             )
+            if dataset.bsr_roi_dir:
+                if viewpoint_cam.roi_mask is None and dataset.bsr_roi_required:
+                    raise FileNotFoundError(
+                        f"Missing required BR-GS ROI mask for camera {viewpoint_cam.image_name!r} "
+                        f"under {dataset.bsr_roi_dir!r}"
+                    )
+                if viewpoint_cam.roi_mask is not None:
+                    bsr_weights = bsr_weights * project_roi_weights(
+                        gaussians.get_xyz, viewpoint_cam, viewpoint_cam.roi_mask
+                    )
             Lbsr, bsr_debug = bernstein_surface_distance_loss(
                 gaussians.get_xyz,
                 gaussians.get_bernstein_control_points,
@@ -179,8 +198,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 robust_delta=opt.bsr_robust_delta,
                 density_k=opt.bsr_density_k,
                 density_blend=opt.bsr_density_blend,
-                floater_lambda=opt.bsr_floater_lambda,
+                floater_lambda=opt.bsr_floater_lambda if refinement_active else 0.0,
                 floater_margin=opt.bsr_floater_margin,
+                support_scale=gaussians._bsr_support_scale.item() if opt.bsr_normalize_distance else 1.0,
+                coverage_lambda=opt.bsr_coverage_lambda if refinement_active else 0.0,
+                control_smoothness_lambda=opt.bsr_control_smoothness_lambda,
+                patch_continuity_lambda=opt.bsr_patch_continuity_lambda,
+                spatial_sampling=opt.bsr_spatial_sampling,
+                frame_origin=gaussians._bsr_frame_origin,
+                frame_u=gaussians._bsr_frame_u,
+                frame_v=gaussians._bsr_frame_v,
+                floater_points=gaussians.get_xyz,
+                floater_weights=gaussians.get_bsr_height_weights(
+                    opt.bsr_z_percentile, opt.bsr_z_softness, opt.bsr_min_weight
+                ),
+                floater_opacities=gaussians.get_opacity,
             )
             loss = loss + bsr_weight * Lbsr
 
@@ -229,6 +261,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 tb_writer.add_scalar("train_loss_patches/bsr_floater_loss", bsr_debug.get("floater_loss", 0.0), iteration)
                 tb_writer.add_scalar("train_loss_patches/bsr_mean_weight", bsr_debug.get("mean_weight", 0.0), iteration)
                 tb_writer.add_scalar("train_loss_patches/bsr_mean_density_weight", bsr_debug.get("mean_density_weight", 0.0), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_coverage_loss", bsr_debug.get("coverage_loss", 0.0), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_control_smoothness_loss", bsr_debug.get("control_smoothness_loss", 0.0), iteration)
+                tb_writer.add_scalar("train_loss_patches/bsr_patch_continuity_loss", bsr_debug.get("patch_continuity_loss", 0.0), iteration)
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
@@ -287,6 +322,67 @@ def prepare_output_and_logger(args):
         print("Tensorboard not available: not logging progress")
     return tb_writer
 
+
+def project_roi_weights(points, camera, roi_mask):
+    """Project Gaussian centers into a binary per-view ROI mask without backpropagating through selection."""
+    with torch.no_grad():
+        homogeneous = torch.cat((points.detach(), torch.ones_like(points[:, :1])), dim=1)
+        clip = homogeneous @ camera.full_proj_transform
+        w = clip[:, 3]
+        ndc = clip[:, :2] / w[:, None].clamp_min(1e-8)
+        grid = ndc.view(1, -1, 1, 2)
+        sampled = F.grid_sample(
+            roi_mask.to(device=points.device, dtype=torch.float32).unsqueeze(0), grid, mode="bilinear",
+            padding_mode="zeros", align_corners=True,
+        ).view(-1)
+        valid = (w > 0) & (ndc.abs() <= 1).all(dim=1)
+        return sampled * valid.to(sampled.dtype)
+
+
+def write_experiment_manifest(model_path, dataset, opt, pipe):
+    """Persist resolved parameters separately from cfg_args for reproducible ablations."""
+    manifest = {
+        "schema": "brgs-experiment-v1",
+        "dataset": vars(dataset),
+        "optimization": vars(opt),
+        "pipeline": vars(pipe),
+        "argv": sys.argv,
+        "torch_version": torch.__version__,
+        "cuda_version": torch.version.cuda,
+    }
+    with open(os.path.join(model_path, "experiment_manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False, default=str)
+
+
+def apply_bsr_v3_preset(args):
+    """Recommended target-domain configuration; explicit values are saved in the manifest."""
+    if not args.bsr_v3:
+        return
+    explicit = {token.split("=", 1)[0] for token in sys.argv[1:] if token.startswith("--")}
+
+    def preset(name, value):
+        if f"--{name}" not in explicit:
+            setattr(args, name, value)
+
+    args.use_bsr = True
+    preset("bsr_axis_mode", "auto")
+    preset("bsr_num_patches_u", 2)
+    preset("bsr_num_patches_v", 2)
+    args.bsr_height_only = True
+    args.bsr_normalize_distance = True
+    preset("bsr_robust_delta", 0.02)
+    preset("bsr_density_blend", 0.25)
+    preset("bsr_coverage_lambda", 0.10)
+    preset("bsr_control_smoothness_lambda", 0.01)
+    preset("bsr_patch_continuity_lambda", 1.0)
+    preset("bsr_floater_lambda", 0.05)
+    args.bsr_spatial_sampling = True
+    preset("bsr_warmup_iters", 5000)
+    preset("bsr_ramp_iters", 10000)
+    preset("bsr_refine_start", 10000)
+    preset("bsr_refine_end", 25000)
+    print("[BR-GS v3] Applied recommended target-domain preset; resolved values will be saved.")
+
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, train_test_exp):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -344,6 +440,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
     args = parser.parse_args(normalize_cli_dashes(sys.argv[1:]))
+    apply_bsr_v3_preset(args)
     args.save_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)
