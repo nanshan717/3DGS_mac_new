@@ -1,0 +1,24 @@
+{
+  "schema": "coffee-fabric-syn-v1",
+  "scene_id": "P01_flat_low_occlusion_v4_photoreal_attempt",
+  "dataset_type": "synthetic",
+  "status": "P01_v4_cycles_visual_attempt_not_final_benchmark",
+  "seed": 101,
+  "units": "metres",
+  "morphology": "flat_with_independent_multifrequency_micro_relief",
+  "occlusion_level": "low",
+  "vegetation_label": "procedural_juvenile_coffee_proxy_qualitatively_calibrated_from_project_field_photos",
+  "field_reference_use": "morphology/layout reference only; no source pixels or textures included",
+  "renderer": {
+    "blender": "5.2.0 LTS",
+    "engine": "CYCLES",
+    "samples": 96,
+    "denoising": true
+  },
+  "camera_count": 48,
+  "license_status": "candidate_pending_project_review",
+  "known_limitations": [
+    "procedural vegetation is not a photogrammetric plant replica",
+    "visual prototype only"
+  ]
+}

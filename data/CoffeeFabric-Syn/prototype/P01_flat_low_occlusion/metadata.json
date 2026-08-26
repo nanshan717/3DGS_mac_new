@@ -1,0 +1,18 @@
+{
+  "schema": "coffee-fabric-syn-v1",
+  "scene_id": "P01_flat_low_occlusion",
+  "dataset_type": "synthetic",
+  "status": "P01_visual_prototype_not_final_benchmark",
+  "seed": 101,
+  "units": "metres",
+  "morphology": "flat_with_independent_multifrequency_micro_relief",
+  "occlusion_level": "low",
+  "vegetation_label": "procedural_coffee-inspired_proxy_not_botanically_validated",
+  "asset_policy": "project-authored procedural geometry only",
+  "renderer": {
+    "blender": "5.2.0 LTS",
+    "engine": "BLENDER_EEVEE"
+  },
+  "camera_count": 48,
+  "license_status": "candidate_pending_project_review"
+}
