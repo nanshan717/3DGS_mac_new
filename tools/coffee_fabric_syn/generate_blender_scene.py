@@ -467,6 +467,10 @@ def add_camera(name, spec):
     bpy.context.collection.objects.link(cam)
     cam.location = spec["position"]
     look_at(cam, spec["look_at"])
+    # A newly linked object's matrix_world may remain the identity until the
+    # dependency graph is evaluated.  Exported NeRF poses must reflect the
+    # assigned location and rotation, not that stale identity matrix.
+    bpy.context.view_layer.update()
     if spec.get("fstop"):
         cam_data.dof.use_dof = True
         cam_data.dof.focus_distance = (Vector(spec["look_at"]) - cam.location).length
@@ -475,6 +479,7 @@ def add_camera(name, spec):
 
 
 def blender_matrix_to_nerf(obj):
+    bpy.context.view_layer.update()
     return [[float(v) for v in row] for row in obj.matrix_world]
 
 
