@@ -1,0 +1,1826 @@
+[
+  {
+    "frame": 0,
+    "station": 0,
+    "side": "left",
+    "file_path": "images/00000",
+    "position": [
+      -2.609256864413848,
+      -3.3496220814458155,
+      1.6737311861567763
+    ],
+    "look_at": [
+      0.09495233210051521,
+      -3.379947312882438,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 1,
+    "station": 0,
+    "side": "right",
+    "file_path": "images/00001",
+    "position": [
+      2.59784879344922,
+      -3.3538791266309804,
+      1.5625003939411155
+    ],
+    "look_at": [
+      -0.020018914891585166,
+      -3.291640108632927,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 2,
+    "station": 1,
+    "side": "left",
+    "file_path": "images/00002",
+    "position": [
+      -2.638410168898384,
+      -3.1903103795160344,
+      1.5363844649265865
+    ],
+    "look_at": [
+      0.08585688888844106,
+      -3.173817299448846,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 3,
+    "station": 1,
+    "side": "right",
+    "file_path": "images/00003",
+    "position": [
+      2.6801736159826675,
+      -3.2052603523697143,
+      1.5797173204209731
+    ],
+    "look_at": [
+      0.0175725986522883,
+      -3.2522055474504477,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 4,
+    "station": 2,
+    "side": "left",
+    "file_path": "images/00004",
+    "position": [
+      -2.540396338493124,
+      -3.0857818238602586,
+      1.647683917109338
+    ],
+    "look_at": [
+      -0.09495247509936236,
+      -3.0623083204752297,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 5,
+    "station": 2,
+    "side": "right",
+    "file_path": "images/00005",
+    "position": [
+      2.7207936095707304,
+      -3.04619955609795,
+      1.5781735005332744
+    ],
+    "look_at": [
+      -0.007912769406926687,
+      -3.0925899303478723,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 6,
+    "station": 3,
+    "side": "left",
+    "file_path": "images/00006",
+    "position": [
+      -2.613877874151605,
+      -2.9282276313764086,
+      1.534210369678699
+    ],
+    "look_at": [
+      -0.05250333580959746,
+      -2.9962103319807136,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 7,
+    "station": 3,
+    "side": "right",
+    "file_path": "images/00007",
+    "position": [
+      2.577818848744869,
+      -2.9316070438100743,
+      1.7647060244761539
+    ],
+    "look_at": [
+      -0.051726659199497954,
+      -3.0103124897104103,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 8,
+    "station": 4,
+    "side": "left",
+    "file_path": "images/00008",
+    "position": [
+      -2.18,
+      -2.777867465275244,
+      2.3904631269111896
+    ],
+    "look_at": [
+      0.05500067019374716,
+      -2.775091865443082,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": true
+  },
+  {
+    "frame": 9,
+    "station": 4,
+    "side": "right",
+    "file_path": "images/00009",
+    "position": [
+      2.18,
+      -2.7609463032373696,
+      2.4811443185017716
+    ],
+    "look_at": [
+      -0.01721676289851362,
+      -2.7931516871573008,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 10,
+    "station": 5,
+    "side": "left",
+    "file_path": "images/00010",
+    "position": [
+      -2.723708293881524,
+      -2.616241545583106,
+      1.8414827219013459
+    ],
+    "look_at": [
+      -0.05520824476933839,
+      -2.5594485614014792,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 11,
+    "station": 5,
+    "side": "right",
+    "file_path": "images/00011",
+    "position": [
+      2.7545441722209247,
+      -2.65703162188557,
+      1.5736117517168102
+    ],
+    "look_at": [
+      0.06803177336829175,
+      -2.733658415844821,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 12,
+    "station": 6,
+    "side": "left",
+    "file_path": "images/00012",
+    "position": [
+      -2.6531349770289974,
+      -2.515557638504867,
+      1.726068229926594
+    ],
+    "look_at": [
+      0.027978821863931413,
+      -2.4845295718947757,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 13,
+    "station": 6,
+    "side": "right",
+    "file_path": "images/00013",
+    "position": [
+      2.6831336328651862,
+      -2.474892623920916,
+      1.6707626247434328
+    ],
+    "look_at": [
+      0.07024941812865473,
+      -2.456443029314164,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 14,
+    "station": 7,
+    "side": "left",
+    "file_path": "images/00014",
+    "position": [
+      -2.572755387560498,
+      -2.3597414310230285,
+      1.76292935897856
+    ],
+    "look_at": [
+      0.0598722173777988,
+      -2.2581741246434834,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 15,
+    "station": 7,
+    "side": "right",
+    "file_path": "images/00015",
+    "position": [
+      2.6315869961646334,
+      -2.36662527575,
+      1.8138162552717378
+    ],
+    "look_at": [
+      -0.024927148932932602,
+      -2.27987138329299,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 16,
+    "station": 8,
+    "side": "left",
+    "file_path": "images/00016",
+    "position": [
+      -2.549698847410549,
+      -2.206862375670324,
+      1.5416297043181015
+    ],
+    "look_at": [
+      0.009821077655932237,
+      -2.271170713241391,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 17,
+    "station": 8,
+    "side": "right",
+    "file_path": "images/00017",
+    "position": [
+      2.610181370176773,
+      -2.2115739927983165,
+      1.4917625003314932
+    ],
+    "look_at": [
+      0.08921714595605648,
+      -2.1850892947696536,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 18,
+    "station": 9,
+    "side": "left",
+    "file_path": "images/00018",
+    "position": [
+      -2.6905421627238333,
+      -2.0682833742369726,
+      1.9161143531040359
+    ],
+    "look_at": [
+      -0.01696977344946811,
+      -2.0932985071198136,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 19,
+    "station": 9,
+    "side": "right",
+    "file_path": "images/00019",
+    "position": [
+      2.698494471188582,
+      -2.070054024273788,
+      1.490498462762572
+    ],
+    "look_at": [
+      -0.07716344243878044,
+      -2.123247592394921,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 20,
+    "station": 10,
+    "side": "left",
+    "file_path": "images/00020",
+    "position": [
+      -2.6282048165765235,
+      -1.9159428023122735,
+      1.540181968442781
+    ],
+    "look_at": [
+      0.09053088644480276,
+      -1.9737345773614134,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 21,
+    "station": 10,
+    "side": "right",
+    "file_path": "images/00021",
+    "position": [
+      2.6955434313234674,
+      -1.9432088337969573,
+      1.6591864480831082
+    ],
+    "look_at": [
+      0.0718567151429085,
+      -2.022370792669191,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 22,
+    "station": 11,
+    "side": "left",
+    "file_path": "images/00022",
+    "position": [
+      -2.6467113786053202,
+      -1.797507213513966,
+      1.6076728343465039
+    ],
+    "look_at": [
+      0.08701193371793722,
+      -1.7952646211862349,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 23,
+    "station": 11,
+    "side": "right",
+    "file_path": "images/00023",
+    "position": [
+      2.5557563591111383,
+      -1.7907384577780172,
+      1.76238127954828
+    ],
+    "look_at": [
+      0.062391980830045685,
+      -1.7767274784845595,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 24,
+    "station": 12,
+    "side": "left",
+    "file_path": "images/00024",
+    "position": [
+      -2.18,
+      -1.614442433666023,
+      2.264903182863129
+    ],
+    "look_at": [
+      0.07205482156402945,
+      -1.7259599408473134,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 25,
+    "station": 12,
+    "side": "right",
+    "file_path": "images/00025",
+    "position": [
+      2.18,
+      -1.6398673286606433,
+      2.5422032830207106
+    ],
+    "look_at": [
+      0.004565249095770163,
+      -1.610401774866876,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 26,
+    "station": 13,
+    "side": "left",
+    "file_path": "images/00026",
+    "position": [
+      -2.547297078025745,
+      -1.4895549909102856,
+      1.6594004013923402
+    ],
+    "look_at": [
+      0.09179539864875405,
+      -1.5155239325685366,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 27,
+    "station": 13,
+    "side": "right",
+    "file_path": "images/00027",
+    "position": [
+      2.637588909416791,
+      -1.4887286864623772,
+      1.8333477566108258
+    ],
+    "look_at": [
+      0.020392541715536325,
+      -1.5427030114170508,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 28,
+    "station": 14,
+    "side": "left",
+    "file_path": "images/00028",
+    "position": [
+      -2.7469807967990634,
+      -1.3385680456104099,
+      1.6432142769012603
+    ],
+    "look_at": [
+      0.033986447581968726,
+      -1.3120362056814614,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 29,
+    "station": 14,
+    "side": "right",
+    "file_path": "images/00029",
+    "position": [
+      2.6362214424484964,
+      -1.3708473453986425,
+      1.5140373315081246
+    ],
+    "look_at": [
+      -0.058451518422300786,
+      -1.4116879590466256,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 30,
+    "station": 15,
+    "side": "left",
+    "file_path": "images/00030",
+    "position": [
+      -2.667861148894335,
+      -1.2326054305385135,
+      1.7617065827137661
+    ],
+    "look_at": [
+      0.0406172396933461,
+      -1.3112965780416754,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 31,
+    "station": 15,
+    "side": "right",
+    "file_path": "images/00031",
+    "position": [
+      2.540309639121322,
+      -1.1945005632311825,
+      1.6659426083752513
+    ],
+    "look_at": [
+      0.02775208159263734,
+      -1.1970622046263164,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 32,
+    "station": 16,
+    "side": "left",
+    "file_path": "images/00032",
+    "position": [
+      -2.5394982449773353,
+      -1.0601924808462357,
+      1.6875449694070774
+    ],
+    "look_at": [
+      0.029839303972405362,
+      -0.9915747093214319,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 33,
+    "station": 16,
+    "side": "right",
+    "file_path": "images/00033",
+    "position": [
+      2.5558341783668688,
+      -1.0915804403675535,
+      1.812585645276625
+    ],
+    "look_at": [
+      0.026257951397445495,
+      -1.1315465899836432,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 34,
+    "station": 17,
+    "side": "left",
+    "file_path": "images/00034",
+    "position": [
+      -2.673154481108424,
+      -0.9210981462645907,
+      1.6653864715428157
+    ],
+    "look_at": [
+      0.04033174924196323,
+      -0.9024361215856935,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 35,
+    "station": 17,
+    "side": "right",
+    "file_path": "images/00035",
+    "position": [
+      2.671599670012449,
+      -0.9116155597226504,
+      1.5979722884351462
+    ],
+    "look_at": [
+      0.034575399466209966,
+      -0.8289679461176002,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 36,
+    "station": 18,
+    "side": "left",
+    "file_path": "images/00036",
+    "position": [
+      -2.5627187323924927,
+      -0.7750864816012935,
+      1.7221647364346881
+    ],
+    "look_at": [
+      0.0008963644638169815,
+      -0.7466589267464958,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 37,
+    "station": 18,
+    "side": "right",
+    "file_path": "images/00037",
+    "position": [
+      2.680537651102572,
+      -0.7729465919868107,
+      1.817782227947923
+    ],
+    "look_at": [
+      -0.017226300106682843,
+      -0.8661206948471571,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 38,
+    "station": 19,
+    "side": "left",
+    "file_path": "images/00038",
+    "position": [
+      -2.648121382318257,
+      -0.6198477160818978,
+      1.5142436668244494
+    ],
+    "look_at": [
+      0.016559147192709428,
+      -0.5843273120302552,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 39,
+    "station": 19,
+    "side": "right",
+    "file_path": "images/00039",
+    "position": [
+      2.521015777573903,
+      -0.6610867452311009,
+      1.6329058895399007
+    ],
+    "look_at": [
+      -0.08124362770760032,
+      -0.7025012152772564,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 40,
+    "station": 20,
+    "side": "left",
+    "file_path": "images/00040",
+    "position": [
+      -2.18,
+      -0.4995367578810553,
+      2.4267790873884336
+    ],
+    "look_at": [
+      0.07591217989582322,
+      -0.43665714311771187,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 41,
+    "station": 20,
+    "side": "right",
+    "file_path": "images/00041",
+    "position": [
+      2.18,
+      -0.5208177381401052,
+      2.393762492584221
+    ],
+    "look_at": [
+      -0.031339936929073206,
+      -0.5853946499909892,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 42,
+    "station": 21,
+    "side": "left",
+    "file_path": "images/00042",
+    "position": [
+      -2.667406093652335,
+      -0.33977919448349625,
+      1.558717309632339
+    ],
+    "look_at": [
+      0.09970128940463147,
+      -0.3800383461405818,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 43,
+    "station": 21,
+    "side": "right",
+    "file_path": "images/00043",
+    "position": [
+      2.6529234835487228,
+      -0.3323027399294115,
+      1.7101815675019894
+    ],
+    "look_at": [
+      0.035526811397109226,
+      -0.39439902888878264,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 44,
+    "station": 22,
+    "side": "left",
+    "file_path": "images/00044",
+    "position": [
+      -2.7285199442260755,
+      -0.19151617761340572,
+      1.8285386051744648
+    ],
+    "look_at": [
+      -0.06953198834737968,
+      -0.24698541629994808,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 45,
+    "station": 22,
+    "side": "right",
+    "file_path": "images/00045",
+    "position": [
+      2.582347562525953,
+      -0.23084002828277178,
+      1.6912894831982974
+    ],
+    "look_at": [
+      0.01333734831755054,
+      -0.19280335233324591,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 46,
+    "station": 23,
+    "side": "left",
+    "file_path": "images/00046",
+    "position": [
+      -2.5231543923438093,
+      -0.05357030153009776,
+      1.6853730624847345
+    ],
+    "look_at": [
+      -0.021100752998898062,
+      -0.13851053374723607,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 47,
+    "station": 23,
+    "side": "right",
+    "file_path": "images/00047",
+    "position": [
+      2.6013165869027657,
+      -0.07117752451647506,
+      1.7424795017722507
+    ],
+    "look_at": [
+      -0.053997607036897134,
+      -0.11430893520027326,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 48,
+    "station": 24,
+    "side": "left",
+    "file_path": "images/00048",
+    "position": [
+      -2.658255895131848,
+      0.04751002475656909,
+      1.5488085734416492
+    ],
+    "look_at": [
+      -0.0548439569215716,
+      0.11777752079817588,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 49,
+    "station": 24,
+    "side": "right",
+    "file_path": "images/00049",
+    "position": [
+      2.6400204809273733,
+      0.06111666631865646,
+      1.6513831233801515
+    ],
+    "look_at": [
+      0.014371443430738706,
+      -0.007641113294976465,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 50,
+    "station": 25,
+    "side": "left",
+    "file_path": "images/00050",
+    "position": [
+      -2.625900258473901,
+      0.21495502048104329,
+      1.5981773161878239
+    ],
+    "look_at": [
+      0.08489486013815506,
+      0.17483686482827832,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 51,
+    "station": 25,
+    "side": "right",
+    "file_path": "images/00051",
+    "position": [
+      2.6553366606073228,
+      0.21386504380725846,
+      1.6307462985102184
+    ],
+    "look_at": [
+      -0.004836105874880342,
+      0.14816949403125124,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 52,
+    "station": 26,
+    "side": "left",
+    "file_path": "images/00052",
+    "position": [
+      -2.7203132364084333,
+      0.3598418806411865,
+      1.6963622151002729
+    ],
+    "look_at": [
+      -0.03893309297568009,
+      0.45149238307828027,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 53,
+    "station": 26,
+    "side": "right",
+    "file_path": "images/00053",
+    "position": [
+      2.695828423439264,
+      0.3749131790388489,
+      1.6259508804028524
+    ],
+    "look_at": [
+      -0.02228396994214557,
+      0.4315432538812437,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 54,
+    "station": 27,
+    "side": "left",
+    "file_path": "images/00054",
+    "position": [
+      -2.5432491006182603,
+      0.48307688199052123,
+      1.5593686816167096
+    ],
+    "look_at": [
+      -0.08240213401569206,
+      0.41420986141410027,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 55,
+    "station": 27,
+    "side": "right",
+    "file_path": "images/00055",
+    "position": [
+      2.6532633932596097,
+      0.49299418993665783,
+      1.8750126057751388
+    ],
+    "look_at": [
+      0.01712394511182469,
+      0.5000788735683387,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 56,
+    "station": 28,
+    "side": "left",
+    "file_path": "images/00056",
+    "position": [
+      -2.18,
+      0.6246072740461288,
+      2.470649470539394
+    ],
+    "look_at": [
+      -0.08533891205531362,
+      0.5692976525821015,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 57,
+    "station": 28,
+    "side": "right",
+    "file_path": "images/00057",
+    "position": [
+      2.18,
+      0.6444208984660832,
+      2.2527087471639273
+    ],
+    "look_at": [
+      -0.0594908525562762,
+      0.6751893729416575,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 58,
+    "station": 29,
+    "side": "left",
+    "file_path": "images/00058",
+    "position": [
+      -2.5905349219968867,
+      0.7952269604898775,
+      1.8087792076567146
+    ],
+    "look_at": [
+      -0.08979793793420449,
+      0.7855041785630567,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 59,
+    "station": 29,
+    "side": "right",
+    "file_path": "images/00059",
+    "position": [
+      2.6347206905591976,
+      0.7606113283669381,
+      1.503848463868837
+    ],
+    "look_at": [
+      0.07330030623810194,
+      0.7001630289682441,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 60,
+    "station": 30,
+    "side": "left",
+    "file_path": "images/00060",
+    "position": [
+      -2.6918402401658783,
+      0.9266666441374631,
+      1.615817293033633
+    ],
+    "look_at": [
+      0.04059960082618663,
+      0.8983722998319682,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 61,
+    "station": 30,
+    "side": "right",
+    "file_path": "images/00061",
+    "position": [
+      2.6681003351341697,
+      0.9383309920643078,
+      1.6289210867960648
+    ],
+    "look_at": [
+      -0.09620385225746902,
+      0.8918033212588613,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 62,
+    "station": 31,
+    "side": "left",
+    "file_path": "images/00062",
+    "position": [
+      -2.52875580723767,
+      1.0502438367467841,
+      1.505456317705188
+    ],
+    "look_at": [
+      0.0054135042592050875,
+      1.0302456311523605,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 63,
+    "station": 31,
+    "side": "right",
+    "file_path": "images/00063",
+    "position": [
+      2.5424762779588326,
+      1.052970448966831,
+      1.882167742710489
+    ],
+    "look_at": [
+      -0.0418685717820452,
+      1.0590362219066478,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 64,
+    "station": 32,
+    "side": "left",
+    "file_path": "images/00064",
+    "position": [
+      -2.547428087541869,
+      1.2129705890821127,
+      1.8016764460756816
+    ],
+    "look_at": [
+      -0.055830119492916434,
+      1.228066659401627,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 65,
+    "station": 32,
+    "side": "right",
+    "file_path": "images/00065",
+    "position": [
+      2.650351084730797,
+      1.2223490402107335,
+      1.5242615205205339
+    ],
+    "look_at": [
+      -0.06990369892445092,
+      1.2011336421789542,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 66,
+    "station": 33,
+    "side": "left",
+    "file_path": "images/00066",
+    "position": [
+      -2.54835036555638,
+      1.3299632827224341,
+      1.8754609704263698
+    ],
+    "look_at": [
+      0.06448756335166858,
+      1.2943087478838011,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 67,
+    "station": 33,
+    "side": "right",
+    "file_path": "images/00067",
+    "position": [
+      2.5746814435675955,
+      1.3735872315003816,
+      1.6878657829912078
+    ],
+    "look_at": [
+      -0.015469766719803338,
+      1.4392867040468857,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 68,
+    "station": 34,
+    "side": "left",
+    "file_path": "images/00068",
+    "position": [
+      -2.563743250395335,
+      1.5029716484020257,
+      1.695980977192123
+    ],
+    "look_at": [
+      0.056894545139269476,
+      1.4745717684189643,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 69,
+    "station": 34,
+    "side": "right",
+    "file_path": "images/00069",
+    "position": [
+      2.754770884785129,
+      1.4821691713029361,
+      1.7510465768483376
+    ],
+    "look_at": [
+      0.06008942411640103,
+      1.4519375924123104,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 70,
+    "station": 35,
+    "side": "left",
+    "file_path": "images/00070",
+    "position": [
+      -2.5512712697508095,
+      1.622892622132254,
+      1.7973761742439627
+    ],
+    "look_at": [
+      0.057661967368662,
+      1.6140220285587705,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 71,
+    "station": 35,
+    "side": "right",
+    "file_path": "images/00071",
+    "position": [
+      2.5765431144152537,
+      1.615302921497973,
+      1.7643965468598561
+    ],
+    "look_at": [
+      -0.09258345970554877,
+      1.6778058066166037,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 72,
+    "station": 36,
+    "side": "left",
+    "file_path": "images/00072",
+    "position": [
+      -2.18,
+      1.7667857371155906,
+      2.3790376621590976
+    ],
+    "look_at": [
+      -0.014338884955505907,
+      1.789421128234354,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 73,
+    "station": 36,
+    "side": "right",
+    "file_path": "images/00073",
+    "position": [
+      2.18,
+      1.7813758648455322,
+      2.458464228565791
+    ],
+    "look_at": [
+      0.09769272792718817,
+      1.7911621155742365,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 74,
+    "station": 37,
+    "side": "left",
+    "file_path": "images/00074",
+    "position": [
+      -2.5482140691447164,
+      1.937645656592606,
+      1.8469310485785324
+    ],
+    "look_at": [
+      -0.014029234416510869,
+      1.9071982430323446,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 75,
+    "station": 37,
+    "side": "right",
+    "file_path": "images/00075",
+    "position": [
+      2.6487315113524286,
+      1.9241010066786992,
+      1.834480168496821
+    ],
+    "look_at": [
+      -0.04509590041955028,
+      1.9026549507021424,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 76,
+    "station": 38,
+    "side": "left",
+    "file_path": "images/00076",
+    "position": [
+      -2.5691729425624614,
+      2.0505646234547306,
+      1.7352171556913496
+    ],
+    "look_at": [
+      0.006579388456945237,
+      2.0843869725650714,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 77,
+    "station": 38,
+    "side": "right",
+    "file_path": "images/00077",
+    "position": [
+      2.6101922951259087,
+      2.0844688135844196,
+      1.562197488020522
+    ],
+    "look_at": [
+      0.01027070335425359,
+      2.164272407159109,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 78,
+    "station": 39,
+    "side": "left",
+    "file_path": "images/00078",
+    "position": [
+      -2.626926705852156,
+      2.204034106983584,
+      1.9132508066199172
+    ],
+    "look_at": [
+      -0.0048672415522224705,
+      2.2476920785460437,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 79,
+    "station": 39,
+    "side": "right",
+    "file_path": "images/00079",
+    "position": [
+      2.522918679205791,
+      2.2339736087408375,
+      1.58093047499728
+    ],
+    "look_at": [
+      0.058909217463130825,
+      2.2145213251131657,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 80,
+    "station": 40,
+    "side": "left",
+    "file_path": "images/00080",
+    "position": [
+      -2.5959754080765833,
+      2.341295860272361,
+      1.8413930840603787
+    ],
+    "look_at": [
+      0.04654580967387098,
+      2.419608738242712,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": false
+  },
+  {
+    "frame": 81,
+    "station": 40,
+    "side": "right",
+    "file_path": "images/00081",
+    "position": [
+      2.5250818193904987,
+      2.3463357434284795,
+      1.901027579775287
+    ],
+    "look_at": [
+      -0.0518924868544775,
+      2.3028753530468844,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 82,
+    "station": 41,
+    "side": "left",
+    "file_path": "images/00082",
+    "position": [
+      -2.71604859301511,
+      2.4801367529239187,
+      1.4857309274370218
+    ],
+    "look_at": [
+      -0.0947718604539034,
+      2.405917015815506,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 83,
+    "station": 41,
+    "side": "right",
+    "file_path": "images/00083",
+    "position": [
+      2.618002927759653,
+      2.473776830831843,
+      1.6497546905239355
+    ],
+    "look_at": [
+      -0.005719345646738774,
+      2.490116257329381,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 84,
+    "station": 42,
+    "side": "left",
+    "file_path": "images/00084",
+    "position": [
+      -2.6018620805406933,
+      2.6371703271125786,
+      1.4818992015221077
+    ],
+    "look_at": [
+      0.09770289245933533,
+      2.649810087327588,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 85,
+    "station": 42,
+    "side": "right",
+    "file_path": "images/00085",
+    "position": [
+      2.661278559245029,
+      2.626483000710402,
+      1.5178398904143207
+    ],
+    "look_at": [
+      -0.02285950716822878,
+      2.7192214472085046,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 86,
+    "station": 43,
+    "side": "left",
+    "file_path": "images/00086",
+    "position": [
+      -2.6307053288423776,
+      2.769983308308505,
+      1.8961562221590265
+    ],
+    "look_at": [
+      -0.01536100294660206,
+      2.7731119013797505,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 87,
+    "station": 43,
+    "side": "right",
+    "file_path": "images/00087",
+    "position": [
+      2.6329334841407124,
+      2.8011205944067563,
+      1.9004222759756375
+    ],
+    "look_at": [
+      0.06994175810090672,
+      2.8603942016886545,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 88,
+    "station": 44,
+    "side": "left",
+    "file_path": "images/00088",
+    "position": [
+      -2.18,
+      2.9422941991062275,
+      2.3777382146474504
+    ],
+    "look_at": [
+      0.08158475374848692,
+      2.867814041128264,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": true
+  },
+  {
+    "frame": 89,
+    "station": 44,
+    "side": "right",
+    "file_path": "images/00089",
+    "position": [
+      2.18,
+      2.9413710583888286,
+      2.37911572461305
+    ],
+    "look_at": [
+      -0.02864448954900438,
+      2.9046077576248015,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "test",
+    "elevated": true
+  },
+  {
+    "frame": 90,
+    "station": 45,
+    "side": "left",
+    "file_path": "images/00090",
+    "position": [
+      -2.524230839863019,
+      3.083324050430906,
+      1.7228508174044292
+    ],
+    "look_at": [
+      -0.024745856888556045,
+      3.087131389801415,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 91,
+    "station": 45,
+    "side": "right",
+    "file_path": "images/00091",
+    "position": [
+      2.55863285012767,
+      3.048010604078017,
+      1.5909652861903256
+    ],
+    "look_at": [
+      0.09192567699847934,
+      3.133582890794253,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 92,
+    "station": 46,
+    "side": "left",
+    "file_path": "images/00092",
+    "position": [
+      -2.656907477001358,
+      3.195583796289884,
+      1.6064735282705924
+    ],
+    "look_at": [
+      -0.02933995973193755,
+      3.2868491319749853,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 93,
+    "station": 46,
+    "side": "right",
+    "file_path": "images/00093",
+    "position": [
+      2.7039076529463015,
+      3.2294608669991782,
+      1.910055603226949
+    ],
+    "look_at": [
+      -0.09395473562694479,
+      3.1118343985148433,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 94,
+    "station": 47,
+    "side": "left",
+    "file_path": "images/00094",
+    "position": [
+      -2.705563002582255,
+      3.354233308460726,
+      1.5329573953658409
+    ],
+    "look_at": [
+      0.08050772692621039,
+      3.3892960154676053,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  },
+  {
+    "frame": 95,
+    "station": 47,
+    "side": "right",
+    "file_path": "images/00095",
+    "position": [
+      2.6838785559354172,
+      3.3526334625051177,
+      1.5861682345720178
+    ],
+    "look_at": [
+      -0.03249217855286149,
+      3.4402400806097377,
+      0.3
+    ],
+    "focal_length_mm": 30.0,
+    "role": "train",
+    "elevated": false
+  }
+]

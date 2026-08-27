@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import random
+import struct
 import sys
 from pathlib import Path
 
@@ -39,6 +40,7 @@ def arguments():
     parser.add_argument("--preview-resolution", type=int, default=640)
     parser.add_argument("--preview-samples", type=int, default=48)
     parser.add_argument("--views", type=int, default=48)
+    parser.add_argument("--dataset-version", choices=("v6", "v7"), default="v6")
     parser.add_argument("--engine", choices=("BLENDER_EEVEE", "CYCLES"), default="BLENDER_EEVEE")
     parser.add_argument("--skip-render", action="store_true", help="Rebuild/export deterministically while retaining existing previews")
     parser.add_argument("--coffee-asset", help="Downloaded CC-licensed .glb/.gltf/.fbx/.obj file or extracted directory")
@@ -439,7 +441,7 @@ def look_at(obj, target):
     obj.rotation_euler = (Vector(target) - obj.location).to_track_quat("-Z", "Y").to_euler()
 
 
-def camera_plan(count, seed):
+def camera_plan_v6(count, seed):
     rng = random.Random(seed + 9000)
     result = []
     for i in range(count):
@@ -457,6 +459,70 @@ def camera_plan(count, seed):
             "role": "test" if i % 8 == 0 else "train",
         })
     return result
+
+
+def camera_plan_v7(count, seed):
+    """Balanced paired trajectory with internal, two-sided held-out views."""
+    if count != 96:
+        raise ValueError("P01 V7 uses exactly 96 views (84 train + 12 test)")
+    rng = random.Random(seed + 17000)
+    stations = count // 2
+    # Interior stations only. Alternating held-out sides yields 6 left + 6 right.
+    test_stations = [4, 7, 11, 15, 18, 22, 26, 29, 33, 37, 40, 44]
+    test_side_at = {station: (-1 if index % 2 == 0 else 1)
+                    for index, station in enumerate(test_stations)}
+    result = []
+    frame = 0
+    for station in range(stations):
+        y = -3.35 + 6.70 * station / (stations - 1)
+        elevated = station % 8 == 4
+        for side in (-1, 1):
+            x = side * (2.18 if elevated else rng.uniform(2.52, 2.76))
+            z = rng.uniform(2.25, 2.55) if elevated else rng.uniform(1.48, 1.92)
+            role = "test" if test_side_at.get(station) == side else "train"
+            result.append({
+                "frame": frame,
+                "station": station,
+                "side": "left" if side < 0 else "right",
+                "file_path": f"images/{frame:05d}",
+                "position": [x, y + rng.uniform(-0.025, 0.025), z],
+                "look_at": [rng.uniform(-0.10, 0.10), y + rng.uniform(-0.10, 0.10), 0.30],
+                "focal_length_mm": 30.0,
+                "role": role,
+                "elevated": elevated,
+            })
+            frame += 1
+    return result
+
+
+def camera_plan(count, seed, version):
+    return camera_plan_v7(count, seed) if version == "v7" else camera_plan_v6(count, seed)
+
+
+def write_initial_point_cloud(path, seed, count=100_000):
+    """Write a deterministic field-aware initialization cloud for 3DGS."""
+    rng = random.Random(seed + 23000)
+    header = (
+        "ply\nformat binary_little_endian 1.0\n"
+        f"element vertex {count}\n"
+        "property float x\nproperty float y\nproperty float z\n"
+        "property float nx\nproperty float ny\nproperty float nz\n"
+        "property uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n"
+    ).encode("ascii")
+    with path.open("wb") as stream:
+        stream.write(header)
+        for _ in range(count):
+            if rng.random() < 0.82:
+                x, y = rng.uniform(-2.65, 2.65), rng.uniform(-3.80, 3.80)
+                z = rng.uniform(-0.16, 0.14)
+                color = (96, 91, 78) if abs(x) <= 2.5 and abs(y) <= 3.6 else (126, 78, 49)
+            else:
+                px, py = rng.choice(FABRIC_PLANTS)
+                radius, angle = rng.uniform(0.0, 0.48), rng.uniform(0.0, math.tau)
+                x, y = px + radius * math.cos(angle), py + radius * math.sin(angle)
+                z = rng.uniform(0.02, 1.55)
+                color = (24, rng.randint(65, 105), 30)
+            stream.write(struct.pack("<ffffffBBB", x, y, z, 0.0, 0.0, 0.0, *color))
 
 
 def add_camera(name, spec):
@@ -568,7 +634,10 @@ def configure_world(scene):
 
 def main():
     args = arguments()
-    scene_id = "P01_flat_low_occlusion_v6_paper_ready" if args.coffee_asset else SCENE_ID
+    if args.dataset_version == "v7" and not args.coffee_asset:
+        raise ValueError("P01 V7 requires the recorded licensed coffee asset")
+    scene_id = ("P01_flat_low_occlusion_v7_balanced96" if args.dataset_version == "v7"
+                else "P01_flat_low_occlusion_v6_paper_ready" if args.coffee_asset else SCENE_ID)
     root = Path(args.output).expanduser().resolve() / scene_id
     for folder in ("images", "bsr_masks", "depth", "fabric_depth", "normals", "ground_truth", "previews", "logs"):
         (root / folder).mkdir(parents=True, exist_ok=True)
@@ -634,9 +703,11 @@ def main():
     scatter_ground_detail(rng, soil, dry_leaf_mat)
     scatter_weeds(rng, weed_mat)
 
-    specs = camera_plan(args.views, args.seed)
+    specs = camera_plan(args.views, args.seed, args.dataset_version)
     (root / "camera_plan.json").write_text(json.dumps(specs, indent=2), encoding="utf-8")
     export_transforms(root, specs)
+    if args.dataset_version == "v7":
+        write_initial_point_cloud(root / "points3d.ply", args.seed)
 
     preview_specs = {
         "P01_paper_overview.png": {"position": [5.7, -6.6, 6.9], "look_at": [0.0, 0.0, 0.12], "focal_length_mm": 58.0, "fstop": 9.0},
@@ -674,7 +745,9 @@ def main():
         "schema": SCHEMA,
         "scene_id": scene_id,
         "dataset_type": "synthetic",
-        "status": "P01_v6_paper_ready_trainable_prototype" if asset_record else "P01_v4_cycles_photoreal_attempt_not_final_benchmark",
+        "status": ("P01_v7_balanced96_trainable_candidate" if args.dataset_version == "v7"
+                   else "P01_v6_paper_ready_trainable_prototype" if asset_record
+                   else "P01_v4_cycles_photoreal_attempt_not_final_benchmark"),
         "seed": args.seed,
         "units": "metres",
         "morphology": "flat_with_independent_multifrequency_micro_relief",
@@ -690,6 +763,8 @@ def main():
             "denoising": args.engine == "CYCLES",
         },
         "camera_count": args.views,
+        "camera_protocol": ("balanced_paired_84_train_12_test_internal_holdout" if args.dataset_version == "v7"
+                            else "legacy_alternating_42_train_6_test"),
         "rgb_dataset_rendered": bool(dataset_paths),
         "dataset_resolution": args.dataset_resolution if dataset_paths else None,
         "license_status": "candidate_pending_project_review",
@@ -705,6 +780,8 @@ def main():
         root / "transforms_test.json",
         metadata_path,
     ]
+    if args.dataset_version == "v7":
+        tracked.append(root / "points3d.ply")
     if asset_record:
         tracked.append(root / "ASSET_ATTRIBUTION.json")
     if dataset_paths:

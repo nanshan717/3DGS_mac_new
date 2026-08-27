@@ -56,3 +56,25 @@ python tools/coffee_fabric_syn/validate_trainable_dataset.py \
 The RGB renderer is the first trainability gate. Fabric masks, depth and normals remain a
 separate export stage and must be produced from the same frozen `.blend` before benchmark
 release.
+
+## P01 V7 balanced training candidate
+
+V7 retains the V6 geometry, materials, licensed coffee asset and seed, while replacing the
+legacy sparse camera protocol with 96 paired views (84 train, 12 internal holdout). Test
+views are balanced across the left and right trajectories, and a deterministic field-aware
+`points3d.ply` replaces the generic `[-1.3, 1.3]` random initialization cube.
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender --background \
+  --python tools/coffee_fabric_syn/generate_blender_scene.py -- \
+  --output data/CoffeeFabric-Syn/prototype --seed 101 \
+  --dataset-version v7 --views 96 \
+  --coffee-asset assets/coffee/a_coffee_tree/a_coffee_tree.glb \
+  --asset-license CC-BY-4.0 --engine CYCLES \
+  --preview-resolution 800 --preview-samples 48 \
+  --render-dataset --dataset-resolution 800 --dataset-samples 48
+```
+
+The validator enforces the 84/12 split, a 6/6 left-right test balance, non-degenerate camera
+baselines, complete PNG references and the presence of the deterministic initialization
+cloud. V6 is retained as a development record and must not be silently replaced by V7.

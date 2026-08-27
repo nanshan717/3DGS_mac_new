@@ -23,10 +23,12 @@ def main():
     root = Path(args.scene).resolve()
     frames = []
     translations = []
+    split_translations = {}
     split_counts = {}
     for split in ("train", "test"):
         payload = json.loads((root / f"transforms_{split}.json").read_text(encoding="utf-8"))
         split_counts[split] = len(payload["frames"])
+        split_translations[split] = []
         for frame in payload["frames"]:
             matrix = frame["transform_matrix"]
             if len(matrix) != 4 or any(len(row) != 4 for row in matrix):
@@ -36,7 +38,9 @@ def main():
             if any(abs(matrix[3][i] - expected) > 1e-6
                    for i, expected in enumerate((0.0, 0.0, 0.0, 1.0))):
                 raise ValueError(f"Invalid homogeneous row in {split}: {frame['file_path']}")
-            translations.append(tuple(float(matrix[i][3]) for i in range(3)))
+            translation = tuple(float(matrix[i][3]) for i in range(3))
+            translations.append(translation)
+            split_translations[split].append(translation)
             frames.append(root / (frame["file_path"] + ".png"))
     missing = [str(path) for path in frames if not path.exists()]
     if missing:
@@ -52,10 +56,23 @@ def main():
             f"Degenerate camera poses: maximum camera baseline is {baseline:.6g}; "
             "all cameras appear colocated"
         )
+    if len(frames) >= 90:
+        if split_counts != {"train": 84, "test": 12}:
+            raise ValueError(f"Expected V7 split 84/12, got {split_counts}")
+        test_sides = {"left": 0, "right": 0}
+        for x, _, _ in split_translations["test"]:
+            test_sides["left" if x < 0 else "right"] += 1
+        if test_sides != {"left": 6, "right": 6}:
+            raise ValueError(f"Unbalanced V7 test sides: {test_sides}")
+        if not (root / "points3d.ply").exists():
+            raise FileNotFoundError("V7 requires deterministic points3d.ply")
+    else:
+        test_sides = None
     print(json.dumps({
         "scene": str(root), "train": split_counts["train"], "test": split_counts["test"],
         "total": len(frames), "resolution": list(next(iter(sizes))),
         "camera_baseline": baseline, "status": "trainable_structure_ok",
+        "test_sides": test_sides,
     }, indent=2))
 
 
