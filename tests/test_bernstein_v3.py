@@ -59,6 +59,36 @@ class BernsteinV3Tests(unittest.TestCase):
         self.assertTrue(torch.isfinite(cp.grad).all())
         self.assertTrue(torch.isfinite(points.grad).all())
 
+    def test_v32_floater_distance_has_corrective_point_gradient(self):
+        x = torch.linspace(-1, 1, 4)
+        y = torch.linspace(-1, 1, 4)
+        xx, yy = torch.meshgrid(x, y, indexing="ij")
+        cp = torch.stack((xx, yy, torch.zeros_like(xx)), dim=-1).requires_grad_(True)
+        points = torch.tensor([[0.0, 0.0, 0.40], [0.2, 0.1, 0.01]], requires_grad=True)
+        loss, debug = bernstein_surface_distance_loss(
+            points,
+            cp,
+            point_weights=torch.ones(2),
+            opacities=torch.full((2, 1), 0.9),
+            samples_u=8,
+            samples_v=8,
+            robust_delta=0.02,
+            floater_lambda=1.0,
+            floater_margin=0.05,
+            floater_points=points,
+            floater_weights=torch.ones(2),
+            floater_opacities=torch.full((2, 1), 0.9),
+            surface_deadzone=0.01,
+            surface_one_sided=True,
+            surface_normal=torch.tensor([0.0, 0.0, 1.0]),
+            floater_distance_loss=True,
+            floater_opacity_min=0.05,
+        )
+        loss.backward()
+        self.assertGreater(debug["floater_loss"], 0.0)
+        self.assertGreater(float(points.grad[0, 2]), 0.0)
+        self.assertTrue(torch.isfinite(points.grad).all())
+
 
 if __name__ == "__main__":
     unittest.main()

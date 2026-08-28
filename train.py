@@ -164,7 +164,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             ssim_value = ssim(image, gt_image)
 
-        loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim_value)
+        reconstruction_loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim_value)
+        loss = reconstruction_loss
 
         Lbsr = torch.tensor(0.0, device="cuda")
         bsr_debug = {"num_bsr_points": 0, "mean_distance": 0.0}
@@ -189,9 +190,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         gaussians.get_xyz, viewpoint_cam, viewpoint_cam.roi_mask
                     )
                     bsr_weights = bsr_weights * roi_weights
-            floater_weights = gaussians.get_bsr_height_weights(
-                opt.bsr_z_percentile, opt.bsr_z_softness, opt.bsr_min_weight
-            )
+            if opt.bsr_floater_distance_loss:
+                # v3.2: ROI selects valid ground support; distance thresholds identify floaters.
+                floater_weights = torch.ones_like(bsr_weights)
+            else:
+                floater_weights = gaussians.get_bsr_height_weights(
+                    opt.bsr_z_percentile, opt.bsr_z_softness, opt.bsr_min_weight
+                )
             if roi_weights is not None:
                 floater_weights = floater_weights * roi_weights
             Lbsr, bsr_debug = bernstein_surface_distance_loss(
@@ -218,6 +223,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 floater_points=gaussians.get_xyz,
                 floater_weights=floater_weights,
                 floater_opacities=gaussians.get_opacity,
+                surface_deadzone=opt.bsr_surface_deadzone,
+                surface_one_sided=opt.bsr_surface_one_sided,
+                surface_normal=gaussians._bsr_frame_normal,
+                floater_distance_loss=opt.bsr_floater_distance_loss,
+                floater_opacity_min=opt.bsr_floater_opacity_min,
             )
             loss = loss + bsr_weight * Lbsr
 
@@ -235,6 +245,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             Ll1depth = 0
 
+        reconstruction_viewspace_grad = None
+        if opt.bsr_isolate_densification and iteration < opt.densify_until_iter:
+            reconstruction_viewspace_grad = torch.autograd.grad(
+                reconstruction_loss, viewspace_point_tensor, retain_graph=True, allow_unused=True
+            )[0]
+            if reconstruction_viewspace_grad is not None:
+                reconstruction_viewspace_grad = reconstruction_viewspace_grad.detach()
         loss.backward()
 
         iter_end.record()
@@ -279,7 +296,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if iteration < opt.densify_until_iter:
                 # Keep track of max radii in image-space for pruning
                 gaussians.max_radii2D[visibility_filter] = torch.max(gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
-                gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
+                gaussians.add_densification_stats(
+                    viewspace_point_tensor, visibility_filter, gradients=reconstruction_viewspace_grad
+                )
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
@@ -425,6 +444,49 @@ def apply_bsr_v31_preset(args):
     preset("bsr_refine_end", 20000)
     print("[BR-GS v3.1] Applied ROI-aware conservative preset; ROI masks are required.")
 
+
+def apply_bsr_v32_preset(args):
+    """Geometry-safe ROI preset; older presets remain unchanged for reproducibility."""
+    if not args.bsr_v32:
+        return
+    if args.bsr_v3 or args.bsr_v31:
+        raise ValueError("Choose only one preset: --bsr_v3, --bsr_v31, or --bsr_v32")
+    explicit = {token.split("=", 1)[0] for token in sys.argv[1:] if token.startswith("--")}
+
+    def preset(name, value):
+        if f"--{name}" not in explicit:
+            setattr(args, name, value)
+
+    args.use_bsr = True
+    preset("bsr_roi_dir", "bsr_masks")
+    args.bsr_roi_required = True
+    preset("bsr_axis_mode", "auto")
+    preset("bsr_num_patches_u", 2)
+    preset("bsr_num_patches_v", 2)
+    args.bsr_height_only = True
+    args.bsr_normalize_distance = True
+    preset("bsr_lambda_max", 0.002)
+    preset("bsr_robust_delta", 0.02)
+    preset("bsr_density_blend", 0.05)
+    preset("bsr_coverage_lambda", 0.01)
+    preset("bsr_control_smoothness_lambda", 0.003)
+    preset("bsr_patch_continuity_lambda", 0.15)
+    preset("bsr_floater_lambda", 0.02)
+    preset("bsr_floater_margin", 0.02)
+    preset("bsr_surface_deadzone", 0.003)
+    preset("bsr_floater_opacity_min", 0.05)
+    args.bsr_surface_one_sided = True
+    args.bsr_floater_distance_loss = True
+    args.bsr_isolate_densification = True
+    args.bsr_spatial_sampling = True
+    preset("bsr_warmup_iters", 5000)
+    preset("bsr_ramp_iters", 10000)
+    preset("bsr_refine_start", 7000)
+    preset("bsr_refine_end", 20000)
+    print(
+        "[BR-GS v3.2] Applied geometry-safe ROI preset; reconstruction-only gradients drive densification."
+    )
+
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, train_test_exp):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -486,6 +548,7 @@ if __name__ == "__main__":
     args = parser.parse_args(normalize_cli_dashes(sys.argv[1:]))
     apply_bsr_v3_preset(args)
     apply_bsr_v31_preset(args)
+    apply_bsr_v32_preset(args)
     args.save_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)

@@ -89,9 +89,19 @@ Render visible ground ROI masks from the frozen V7 scene with:
 ```
 
 These masks are synthetic ground-truth annotations: visible terrain and protective fabric are
-white; coffee plants, weeds, root guards, posts and sky are black. BR-GS v3.1 requires them
+white; coffee plants, weeds, root guards, posts and sky are black. BR-GS v3.1/v3.2 requires them
 and applies the ROI to both surface fitting and floater suppression:
 
 ```text
 --bsr_v31
 ```
+
+For the geometry-safe preset used after the V7 15k diagnostic, use:
+
+```bash
+--bsr_v32
+```
+
+V3.2 keeps ROI-aware surface fitting, applies direct distance correction only beyond a
+dead zone, and records reconstruction-only image-space gradients for densification. The
+older `--bsr_v3` and `--bsr_v31` presets remain unchanged for ablation reproducibility.

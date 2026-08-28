@@ -122,6 +122,7 @@ class OptimizationParams(ParamGroup):
         # use --bsr_v3 to enable the recommended final configuration in train.py.
         self.bsr_v3 = False
         self.bsr_v31 = False
+        self.bsr_v32 = False
         self.bsr_axis_mode = "z"
         self.bsr_num_patches_u = 1
         self.bsr_num_patches_v = 1
@@ -133,6 +134,12 @@ class OptimizationParams(ParamGroup):
         self.bsr_spatial_sampling = False
         self.bsr_refine_start = -1
         self.bsr_refine_end = -1
+        # v3.2 safety controls. Disabled by default so earlier presets remain exact.
+        self.bsr_surface_deadzone = 0.0
+        self.bsr_surface_one_sided = False
+        self.bsr_floater_distance_loss = False
+        self.bsr_floater_opacity_min = 0.0
+        self.bsr_isolate_densification = False
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

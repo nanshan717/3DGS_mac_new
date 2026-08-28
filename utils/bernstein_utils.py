@@ -148,6 +148,11 @@ def bernstein_surface_distance_loss(
     floater_points=None,
     floater_weights=None,
     floater_opacities=None,
+    surface_deadzone=0.0,
+    surface_one_sided=False,
+    surface_normal=None,
+    floater_distance_loss=False,
+    floater_opacity_min=0.0,
 ):
     """Robust weighted nearest-distance loss from Gaussians to a sampled Bernstein surface."""
     if point_weights is None:
@@ -200,13 +205,26 @@ def bernstein_surface_distance_loss(
 
     surface_points = evaluate_bernstein_surface(control_points, samples_u, samples_v)
     min_dist_sq_chunks = []
+    nearest_index_chunks = []
     for chunk in torch.split(points, max(1, chunk_size), dim=0):
         dist_sq = torch.cdist(chunk, surface_points).square()
-        min_dist_sq_chunks.append(dist_sq.min(dim=1).values)
+        nearest = dist_sq.min(dim=1)
+        min_dist_sq_chunks.append(nearest.values)
+        nearest_index_chunks.append(nearest.indices)
 
     scale_sq = max(float(support_scale) ** 2, 1e-12)
     min_dist_sq = torch.cat(min_dist_sq_chunks, dim=0) / scale_sq
     distances = torch.sqrt(min_dist_sq + 1e-12)
+    if surface_one_sided and surface_normal is not None:
+        nearest_surface = surface_points[torch.cat(nearest_index_chunks)]
+        normal = surface_normal.to(device=points.device, dtype=points.dtype)
+        normal = normal / normal.norm().clamp_min(1e-8)
+        distances = (
+            ((points - nearest_surface) * normal).sum(dim=-1).clamp_min(0.0)
+            / max(float(support_scale), 1e-6)
+        )
+    if surface_deadzone > 0.0:
+        distances = (distances - float(surface_deadzone)).clamp_min(0.0)
     robust_delta = float(robust_delta)
     if robust_delta > 0.0:
         delta = torch.tensor(robust_delta, device=points.device, dtype=points.dtype)
@@ -237,7 +255,8 @@ def bernstein_surface_distance_loss(
                 fp, fw, fo = _subsample_aligned(max_points, fp, fw, fo)
             floater_dist_chunks = []
             for chunk in torch.split(fp, max(1, chunk_size), dim=0):
-                floater_dist_chunks.append(torch.cdist(chunk, surface_points).square().min(dim=1).values)
+                # A detached reference prevents outliers from dragging the fitted ground toward them.
+                floater_dist_chunks.append(torch.cdist(chunk, surface_points.detach()).square().min(dim=1).values)
             floater_distances = torch.sqrt(torch.cat(floater_dist_chunks) / scale_sq + 1e-12)
             opacity_values = fo.squeeze(-1) if fo.ndim > 1 else fo
         else:
@@ -254,7 +273,17 @@ def bernstein_surface_distance_loss(
                     margin = (median + 2.0 * mad).clamp_min(1e-6)
                 softness = (0.25 * margin).clamp_min(1e-6)
                 far_confidence = torch.sigmoid((detached_distances - margin) / softness)
-            floater_loss = _weighted_mean(opacity_values * far_confidence, fw)
+            opacity_floor = float(max(0.0, min(0.99, floater_opacity_min)))
+            opacity_confidence = (
+                (opacity_values.detach() - opacity_floor) / max(1.0 - opacity_floor, 1e-6)
+            ).clamp(0.0, 1.0)
+            if floater_distance_loss:
+                # Directly correct geometrically remote Gaussians; the confidence/selection is detached.
+                excess = (floater_distances - margin).clamp_min(0.0)
+                floater_loss = _weighted_mean(excess * far_confidence * opacity_confidence, fw)
+            else:
+                # Legacy behavior: suppress opacity only. Kept for exact v3/v3.1 reproduction.
+                floater_loss = _weighted_mean(opacity_values * far_confidence, fw)
 
     coverage_loss = surface_loss * 0.0
     if coverage_lambda > 0.0:
