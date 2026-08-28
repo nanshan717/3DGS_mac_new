@@ -177,6 +177,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 opt.bsr_z_softness,
                 opt.bsr_min_weight,
             )
+            roi_weights = None
             if dataset.bsr_roi_dir:
                 if viewpoint_cam.roi_mask is None and dataset.bsr_roi_required:
                     raise FileNotFoundError(
@@ -184,9 +185,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         f"under {dataset.bsr_roi_dir!r}"
                     )
                 if viewpoint_cam.roi_mask is not None:
-                    bsr_weights = bsr_weights * project_roi_weights(
+                    roi_weights = project_roi_weights(
                         gaussians.get_xyz, viewpoint_cam, viewpoint_cam.roi_mask
                     )
+                    bsr_weights = bsr_weights * roi_weights
+            floater_weights = gaussians.get_bsr_height_weights(
+                opt.bsr_z_percentile, opt.bsr_z_softness, opt.bsr_min_weight
+            )
+            if roi_weights is not None:
+                floater_weights = floater_weights * roi_weights
             Lbsr, bsr_debug = bernstein_surface_distance_loss(
                 gaussians.get_xyz,
                 gaussians.get_bernstein_control_points,
@@ -209,9 +216,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 frame_u=gaussians._bsr_frame_u,
                 frame_v=gaussians._bsr_frame_v,
                 floater_points=gaussians.get_xyz,
-                floater_weights=gaussians.get_bsr_height_weights(
-                    opt.bsr_z_percentile, opt.bsr_z_softness, opt.bsr_min_weight
-                ),
+                floater_weights=floater_weights,
                 floater_opacities=gaussians.get_opacity,
             )
             loss = loss + bsr_weight * Lbsr
@@ -245,6 +250,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     "Loss": f"{ema_loss_for_log:.{7}f}",
                     "Depth Loss": f"{ema_Ll1depth_for_log:.{7}f}",
                     "BSR": f"{ema_Lbsr_for_log:.{7}f}",
+                    "Surf": f"{bsr_debug.get('surface_loss', 0.0):.{5}f}",
+                    "Float": f"{bsr_debug.get('floater_loss', 0.0):.{5}f}",
                 })
                 progress_bar.update(10)
             if iteration == opt.iterations:
@@ -383,6 +390,41 @@ def apply_bsr_v3_preset(args):
     preset("bsr_refine_end", 25000)
     print("[BR-GS v3] Applied recommended target-domain preset; resolved values will be saved.")
 
+
+def apply_bsr_v31_preset(args):
+    """ROI-aware conservative preset; v3 remains unchanged for reproducibility."""
+    if not args.bsr_v31:
+        return
+    if args.bsr_v3:
+        raise ValueError("Choose only one preset: --bsr_v3 or --bsr_v31")
+    explicit = {token.split("=", 1)[0] for token in sys.argv[1:] if token.startswith("--")}
+
+    def preset(name, value):
+        if f"--{name}" not in explicit:
+            setattr(args, name, value)
+
+    args.use_bsr = True
+    preset("bsr_roi_dir", "bsr_masks")
+    args.bsr_roi_required = True
+    preset("bsr_axis_mode", "auto")
+    preset("bsr_num_patches_u", 2)
+    preset("bsr_num_patches_v", 2)
+    args.bsr_height_only = True
+    args.bsr_normalize_distance = True
+    preset("bsr_lambda_max", 0.003)
+    preset("bsr_robust_delta", 0.02)
+    preset("bsr_density_blend", 0.10)
+    preset("bsr_coverage_lambda", 0.02)
+    preset("bsr_control_smoothness_lambda", 0.005)
+    preset("bsr_patch_continuity_lambda", 0.25)
+    preset("bsr_floater_lambda", 0.05)
+    args.bsr_spatial_sampling = True
+    preset("bsr_warmup_iters", 5000)
+    preset("bsr_ramp_iters", 10000)
+    preset("bsr_refine_start", 10000)
+    preset("bsr_refine_end", 20000)
+    print("[BR-GS v3.1] Applied ROI-aware conservative preset; ROI masks are required.")
+
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, train_test_exp):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -443,6 +485,7 @@ if __name__ == "__main__":
     parser.add_argument("--start_checkpoint", type=str, default = None)
     args = parser.parse_args(normalize_cli_dashes(sys.argv[1:]))
     apply_bsr_v3_preset(args)
+    apply_bsr_v31_preset(args)
     args.save_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)

@@ -66,13 +66,33 @@ def main():
             raise ValueError(f"Unbalanced V7 test sides: {test_sides}")
         if not (root / "points3d.ply").exists():
             raise FileNotFoundError("V7 requires deterministic points3d.ply")
+        mask_manifest_path = root / "bsr_masks_manifest.json"
+        if mask_manifest_path.exists():
+            mask_manifest = json.loads(mask_manifest_path.read_text(encoding="utf-8"))
+            masks = [root / relative for relative in mask_manifest["files"]]
+            if len(masks) != len(frames):
+                raise ValueError(f"Expected {len(frames)} ROI masks, got {len(masks)}")
+            expected_masks = {root / "bsr_masks" / (path.stem + ".png") for path in frames}
+            if set(masks) != expected_masks:
+                raise ValueError("ROI mask names do not exactly match train/test image stems")
+            missing_masks = [str(path) for path in masks if not path.exists()]
+            if missing_masks:
+                raise FileNotFoundError(f"Missing ROI mask: {missing_masks[0]}")
+            mask_sizes = {png_size(path) for path in masks}
+            if mask_sizes != sizes:
+                raise ValueError(f"ROI mask/image size mismatch: masks={mask_sizes}, images={sizes}")
+            roi_masks = len(masks)
+        else:
+            roi_masks = 0
     else:
         test_sides = None
+        roi_masks = 0
     print(json.dumps({
         "scene": str(root), "train": split_counts["train"], "test": split_counts["test"],
         "total": len(frames), "resolution": list(next(iter(sizes))),
         "camera_baseline": baseline, "status": "trainable_structure_ok",
         "test_sides": test_sides,
+        "roi_masks": roi_masks,
     }, indent=2))
 
 

@@ -78,3 +78,20 @@ views are balanced across the left and right trajectories, and a deterministic f
 The validator enforces the 84/12 split, a 6/6 left-right test balance, non-degenerate camera
 baselines, complete PNG references and the presence of the deterministic initialization
 cloud. V6 is retained as a development record and must not be silently replaced by V7.
+
+Render visible ground ROI masks from the frozen V7 scene with:
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender \
+  data/CoffeeFabric-Syn/prototype/P01_flat_low_occlusion_v7_balanced96/P01_flat_low_occlusion_v7_balanced96.blend \
+  --background --python tools/coffee_fabric_syn/render_ground_roi_masks.py -- \
+  data/CoffeeFabric-Syn/prototype/P01_flat_low_occlusion_v7_balanced96 --resolution 800
+```
+
+These masks are synthetic ground-truth annotations: visible terrain and protective fabric are
+white; coffee plants, weeds, root guards, posts and sky are black. BR-GS v3.1 requires them
+and applies the ROI to both surface fitting and floater suppression:
+
+```text
+--bsr_v31
+```

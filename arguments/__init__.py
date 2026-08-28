@@ -121,6 +121,7 @@ class OptimizationParams(ParamGroup):
         # BR-GS v3 options. Defaults keep legacy BR-GS behavior reproducible;
         # use --bsr_v3 to enable the recommended final configuration in train.py.
         self.bsr_v3 = False
+        self.bsr_v31 = False
         self.bsr_axis_mode = "z"
         self.bsr_num_patches_u = 1
         self.bsr_num_patches_v = 1
