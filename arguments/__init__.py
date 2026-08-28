@@ -124,6 +124,7 @@ class OptimizationParams(ParamGroup):
         self.bsr_v31 = False
         self.bsr_v32 = False
         self.bsr_v33 = False
+        self.bsr_v34 = False
         self.bsr_axis_mode = "z"
         self.bsr_num_patches_u = 1
         self.bsr_num_patches_v = 1
@@ -144,6 +145,15 @@ class OptimizationParams(ParamGroup):
         self.bsr_surface_loss_lambda = 1.0
         self.bsr_floater_roi_candidates = False
         self.bsr_floater_visible_only = False
+        # v3.4 auditable one-shot geometry pruning. Disabled by default.
+        self.bsr_prune_iter = -1
+        self.bsr_prune_opacity_max = 0.05
+        self.bsr_prune_distance_min = 0.02
+        self.bsr_prune_roi_consensus = 0.60
+        self.bsr_prune_roi_views = 8
+        self.bsr_prune_min_valid_views = 2
+        self.bsr_prune_max_fraction = 0.05
+        self.bsr_disable_after_prune = False
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

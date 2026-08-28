@@ -13,7 +13,7 @@ import os
 import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim
-from utils.bernstein_utils import bernstein_surface_distance_loss
+from utils.bernstein_utils import bernstein_surface_distance_loss, evaluate_bernstein_surface
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -97,6 +97,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     def get_bsr_weight(iteration):
         if not opt.use_bsr:
             return 0.0
+        if opt.bsr_disable_after_prune and opt.bsr_prune_iter > 0 and iteration >= opt.bsr_prune_iter:
+            return 0.0
         if iteration < opt.bsr_warmup_iters:
             return 0.0
         if opt.bsr_ramp_iters <= 0:
@@ -128,6 +130,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 network_gui.conn = None
 
         iter_start.record()
+
+        if opt.bsr_prune_iter > 0 and iteration == opt.bsr_prune_iter:
+            run_bsr_geometry_pruning(gaussians, scene, dataset, opt, iteration)
 
         gaussians.update_learning_rate(iteration)
 
@@ -367,6 +372,12 @@ def prepare_output_and_logger(args):
 
 def project_roi_weights(points, camera, roi_mask):
     """Project Gaussian centers into a binary per-view ROI mask without backpropagating through selection."""
+    sampled, valid = project_roi_weights_and_valid(points, camera, roi_mask)
+    return sampled * valid.to(sampled.dtype)
+
+
+def project_roi_weights_and_valid(points, camera, roi_mask):
+    """Return sampled ROI values and an in-frustum mask for deterministic consensus tests."""
     with torch.no_grad():
         homogeneous = torch.cat((points.detach(), torch.ones_like(points[:, :1])), dim=1)
         clip = homogeneous @ camera.full_proj_transform
@@ -378,7 +389,104 @@ def project_roi_weights(points, camera, roi_mask):
             padding_mode="zeros", align_corners=True,
         ).view(-1)
         valid = (w > 0) & (ndc.abs() <= 1).all(dim=1)
-        return sampled * valid.to(sampled.dtype)
+        return sampled, valid
+
+
+def _nearest_surface_distances(points, surface_points, support_scale, chunk_size=8192):
+    """Memory-bounded normalized point-to-surface distances used by one-shot pruning."""
+    distances = []
+    scale = max(float(support_scale), 1e-6)
+    for chunk in torch.split(points, max(1, int(chunk_size)), dim=0):
+        distances.append(torch.cdist(chunk, surface_points).min(dim=1).values / scale)
+    return torch.cat(distances, dim=0)
+
+
+def run_bsr_geometry_pruning(gaussians, scene, dataset, opt, iteration):
+    """Physically remove conservative, multi-view-confirmed floater candidates once."""
+    if not gaussians.has_bernstein_surface:
+        raise RuntimeError("BR-GS v3.4 pruning requires an initialized Bernstein surface")
+
+    with torch.no_grad():
+        xyz = gaussians.get_xyz.detach()
+        opacity = gaussians.get_opacity.detach().reshape(-1)
+        before = int(xyz.shape[0])
+        surface = evaluate_bernstein_surface(
+            gaussians.get_bernstein_control_points.detach(),
+            opt.bsr_surface_samples_u,
+            opt.bsr_surface_samples_v,
+        )
+        support_scale = gaussians._bsr_support_scale.item() if opt.bsr_normalize_distance else 1.0
+        low_opacity_indices = (opacity <= float(opt.bsr_prune_opacity_max)).nonzero(
+            as_tuple=False
+        ).reshape(-1)
+        low_opacity_distances = _nearest_surface_distances(
+            xyz[low_opacity_indices], surface, support_scale
+        ) if low_opacity_indices.numel() > 0 else torch.empty(0, device=xyz.device, dtype=xyz.dtype)
+        far_low_mask = low_opacity_distances >= float(opt.bsr_prune_distance_min)
+        candidate_indices = low_opacity_indices[far_low_mask]
+        candidate_distances = low_opacity_distances[far_low_mask]
+
+        roi_consensus = torch.zeros(candidate_indices.numel(), device=xyz.device, dtype=xyz.dtype)
+        valid_counts = torch.zeros(candidate_indices.numel(), device=xyz.device, dtype=torch.int32)
+        cameras = scene.getTrainCameras()
+        requested_views = max(1, min(int(opt.bsr_prune_roi_views), len(cameras)))
+        camera_indices = torch.linspace(0, len(cameras) - 1, requested_views).round().long().unique().tolist()
+        if candidate_indices.numel() > 0:
+            candidate_points = xyz[candidate_indices]
+            roi_sum = torch.zeros_like(roi_consensus)
+            for camera_index in camera_indices:
+                camera = cameras[int(camera_index)]
+                if camera.roi_mask is None:
+                    if dataset.bsr_roi_required:
+                        raise FileNotFoundError(
+                            f"Missing required BR-GS ROI mask for camera {camera.image_name!r}"
+                        )
+                    continue
+                sampled, valid = project_roi_weights_and_valid(candidate_points, camera, camera.roi_mask)
+                roi_sum += sampled * valid.to(sampled.dtype)
+                valid_counts += valid.to(torch.int32)
+            roi_consensus = roi_sum / valid_counts.clamp_min(1).to(roi_sum.dtype)
+
+        confirmed = (valid_counts >= int(opt.bsr_prune_min_valid_views)) & (
+            roi_consensus >= float(opt.bsr_prune_roi_consensus)
+        )
+        confirmed_indices = candidate_indices[confirmed]
+        max_remove = max(0, int(before * float(opt.bsr_prune_max_fraction)))
+        if confirmed_indices.numel() > max_remove:
+            scores = candidate_distances[confirmed] * (1.0 - opacity[confirmed_indices]) * roi_consensus[confirmed]
+            keep = torch.topk(scores, k=max_remove, largest=True, sorted=False).indices
+            confirmed_indices = confirmed_indices[keep]
+
+        prune_mask = torch.zeros(before, device=xyz.device, dtype=torch.bool)
+        prune_mask[confirmed_indices] = True
+        removed = int(prune_mask.sum().item())
+        if removed > 0:
+            gaussians.prune_points(prune_mask)
+            torch.cuda.empty_cache()
+
+    audit = {
+        "schema": "brgs-v34-pruning-v1",
+        "iteration": int(iteration),
+        "points_before": before,
+        "base_candidates": int(candidate_indices.numel()),
+        "confirmed_candidates": int(confirmed.sum().item()),
+        "points_removed": removed,
+        "points_after": int(gaussians.get_xyz.shape[0]),
+        "removed_fraction": float(removed / max(before, 1)),
+        "opacity_max": float(opt.bsr_prune_opacity_max),
+        "normalized_distance_min": float(opt.bsr_prune_distance_min),
+        "roi_consensus_min": float(opt.bsr_prune_roi_consensus),
+        "roi_views": [int(x) for x in camera_indices],
+        "min_valid_views": int(opt.bsr_prune_min_valid_views),
+        "max_fraction": float(opt.bsr_prune_max_fraction),
+    }
+    audit_path = os.path.join(dataset.model_path, "bsr_v34_pruning.json")
+    with open(audit_path, "w", encoding="utf-8") as f:
+        json.dump(audit, f, indent=2, ensure_ascii=False)
+    print(
+        f"[BR-GS v3.4] Pruned {removed}/{before} Gaussians "
+        f"({100.0 * removed / max(before, 1):.2f}%); audit: {audit_path}"
+    )
 
 
 def write_experiment_manifest(model_path, dataset, opt, pipe):
@@ -546,6 +654,61 @@ def apply_bsr_v33_preset(args):
         "[BR-GS v3.3] Applied ROI-aware opacity-only floater suppression; xyz gradients are disabled."
     )
 
+
+def apply_bsr_v34_preset(args):
+    """Two-stage, auditable geometry pruning followed by reconstruction-only recovery."""
+    if not args.bsr_v34:
+        return
+    if args.bsr_v3 or args.bsr_v31 or args.bsr_v32 or args.bsr_v33:
+        raise ValueError(
+            "Choose only one preset: --bsr_v3, --bsr_v31, --bsr_v32, --bsr_v33, or --bsr_v34"
+        )
+    explicit = {token.split("=", 1)[0] for token in sys.argv[1:] if token.startswith("--")}
+
+    def preset(name, value):
+        if f"--{name}" not in explicit:
+            setattr(args, name, value)
+
+    args.use_bsr = True
+    preset("bsr_roi_dir", "bsr_masks")
+    args.bsr_roi_required = True
+    preset("bsr_axis_mode", "auto")
+    preset("bsr_num_patches_u", 2)
+    preset("bsr_num_patches_v", 2)
+    args.bsr_height_only = True
+    args.bsr_normalize_distance = True
+    preset("bsr_lambda_max", 0.002)
+    preset("bsr_surface_loss_lambda", 0.0)
+    preset("bsr_density_blend", 0.0)
+    preset("bsr_coverage_lambda", 0.0)
+    preset("bsr_control_smoothness_lambda", 0.003)
+    preset("bsr_patch_continuity_lambda", 0.10)
+    preset("bsr_floater_lambda", 0.03)
+    preset("bsr_floater_margin", 0.02)
+    preset("bsr_floater_opacity_min", 0.05)
+    args.bsr_floater_roi_candidates = True
+    args.bsr_floater_visible_only = True
+    args.bsr_floater_distance_loss = False
+    args.bsr_isolate_densification = True
+    args.bsr_spatial_sampling = True
+    preset("bsr_warmup_iters", 5000)
+    preset("bsr_ramp_iters", 5000)
+    preset("bsr_refine_start", 7000)
+    preset("bsr_refine_end", 20000)
+    preset("bsr_prune_iter", 12000)
+    preset("bsr_prune_opacity_max", 0.05)
+    preset("bsr_prune_distance_min", 0.02)
+    preset("bsr_prune_roi_consensus", 0.60)
+    preset("bsr_prune_roi_views", 8)
+    preset("bsr_prune_min_valid_views", 2)
+    preset("bsr_prune_max_fraction", 0.05)
+    args.bsr_disable_after_prune = True
+    if "--densify_until_iter" not in explicit:
+        args.densify_until_iter = args.bsr_prune_iter
+    print(
+        "[BR-GS v3.4] Applied two-stage geometry pruning preset; densification stops at pruning."
+    )
+
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, train_test_exp):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -609,6 +772,7 @@ if __name__ == "__main__":
     apply_bsr_v31_preset(args)
     apply_bsr_v32_preset(args)
     apply_bsr_v33_preset(args)
+    apply_bsr_v34_preset(args)
     args.save_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)

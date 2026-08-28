@@ -115,3 +115,15 @@ V3.3 replaces direct point displacement with conservative opacity-only suppressi
 Only visible, ROI-approved Gaussians beyond the detached surface-distance margin receive
 the floater penalty. This branch cannot update Gaussian positions or the fitted surface,
 and densification continues to use reconstruction gradients only.
+
+V3.4 adds one auditable pruning event followed by reconstruction-only recovery:
+
+```bash
+--bsr_v34
+```
+
+At the pruning iteration, a Gaussian must simultaneously have low opacity, exceed the
+normalized Bernstein-surface distance margin, and satisfy the ground-ROI consensus in
+multiple training views. A hard maximum removal fraction is enforced. The resolved
+thresholds and before/after counts are written to `bsr_v34_pruning.json`; densification
+and BR-GS regularization are disabled after pruning.
