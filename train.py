@@ -200,11 +200,20 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if roi_weights is not None:
                 floater_weights = floater_weights * roi_weights
             if opt.bsr_floater_visible_only:
-                # Rasterizer variants expose visibility as either [N] or [N, 1].
-                # Flatten both operands to avoid accidental [N, N] broadcasting.
-                floater_weights = floater_weights.reshape(-1) * visibility_filter.detach().reshape(-1).to(
-                    floater_weights.dtype
-                )
+                # Rasterizer variants expose either a full boolean mask or the [M, 1]
+                # indices returned by ``(radii > 0).nonzero()``. Normalize to [N].
+                floater_weights = floater_weights.reshape(-1)
+                raw_visibility = visibility_filter.detach()
+                if raw_visibility.dtype == torch.bool and raw_visibility.numel() == floater_weights.numel():
+                    visible_weights = raw_visibility.reshape(-1).to(floater_weights.dtype)
+                else:
+                    visible_weights = torch.zeros_like(floater_weights)
+                    visible_indices = raw_visibility.reshape(-1).long()
+                    valid_indices = visible_indices[
+                        (visible_indices >= 0) & (visible_indices < floater_weights.numel())
+                    ]
+                    visible_weights[valid_indices] = 1.0
+                floater_weights = floater_weights * visible_weights
             Lbsr, bsr_debug = bernstein_surface_distance_loss(
                 gaussians.get_xyz,
                 gaussians.get_bernstein_control_points,
