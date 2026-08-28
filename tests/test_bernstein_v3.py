@@ -89,6 +89,33 @@ class BernsteinV3Tests(unittest.TestCase):
         self.assertGreater(float(points.grad[0, 2]), 0.0)
         self.assertTrue(torch.isfinite(points.grad).all())
 
+    def test_v33_opacity_only_floater_does_not_move_points(self):
+        x = torch.linspace(-1, 1, 4)
+        y = torch.linspace(-1, 1, 4)
+        xx, yy = torch.meshgrid(x, y, indexing="ij")
+        cp = torch.stack((xx, yy, torch.zeros_like(xx)), dim=-1).requires_grad_(True)
+        points = torch.tensor([[0.0, 0.0, 0.40]], requires_grad=True)
+        opacity = torch.tensor([[0.9]], requires_grad=True)
+        loss, _ = bernstein_surface_distance_loss(
+            points,
+            cp,
+            point_weights=torch.ones(1),
+            samples_u=8,
+            samples_v=8,
+            floater_lambda=1.0,
+            floater_margin=0.05,
+            floater_points=points,
+            floater_weights=torch.ones(1),
+            floater_opacities=opacity,
+            floater_distance_loss=False,
+            floater_opacity_min=0.05,
+            surface_loss_lambda=0.0,
+        )
+        loss.backward()
+        self.assertIsNotNone(opacity.grad)
+        self.assertGreater(float(opacity.grad), 0.0)
+        self.assertTrue(points.grad is None or torch.equal(points.grad, torch.zeros_like(points)))
+
 
 if __name__ == "__main__":
     unittest.main()

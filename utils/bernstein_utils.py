@@ -153,6 +153,7 @@ def bernstein_surface_distance_loss(
     surface_normal=None,
     floater_distance_loss=False,
     floater_opacity_min=0.0,
+    surface_loss_lambda=1.0,
 ):
     """Robust weighted nearest-distance loss from Gaussians to a sampled Bernstein surface."""
     if point_weights is None:
@@ -283,7 +284,11 @@ def bernstein_surface_distance_loss(
                 floater_loss = _weighted_mean(excess * far_confidence * opacity_confidence, fw)
             else:
                 # Legacy behavior: suppress opacity only. Kept for exact v3/v3.1 reproduction.
-                floater_loss = _weighted_mean(opacity_values * far_confidence, fw)
+                if floater_opacity_min > 0.0:
+                    opacity_penalty = (opacity_values - float(floater_opacity_min)).clamp_min(0.0)
+                else:
+                    opacity_penalty = opacity_values
+                floater_loss = _weighted_mean(opacity_penalty * far_confidence, fw)
 
     coverage_loss = surface_loss * 0.0
     if coverage_lambda > 0.0:
@@ -296,7 +301,7 @@ def bernstein_surface_distance_loss(
     control_smoothness = control_smoothness / scale_sq
     patch_continuity = patch_continuity / scale_sq
     loss = (
-        surface_loss
+        float(surface_loss_lambda) * surface_loss
         + float(coverage_lambda) * coverage_loss
         + float(control_smoothness_lambda) * control_smoothness
         + float(patch_continuity_lambda) * patch_continuity

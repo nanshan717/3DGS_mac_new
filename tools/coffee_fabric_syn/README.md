@@ -105,3 +105,13 @@ For the geometry-safe preset used after the V7 15k diagnostic, use:
 V3.2 keeps ROI-aware surface fitting, applies direct distance correction only beyond a
 dead zone, and records reconstruction-only image-space gradients for densification. The
 older `--bsr_v3` and `--bsr_v31` presets remain unchanged for ablation reproducibility.
+
+V3.3 replaces direct point displacement with conservative opacity-only suppression:
+
+```bash
+--bsr_v33
+```
+
+Only visible, ROI-approved Gaussians beyond the detached surface-distance margin receive
+the floater penalty. This branch cannot update Gaussian positions or the fitted surface,
+and densification continues to use reconstruction gradients only.

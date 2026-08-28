@@ -123,6 +123,7 @@ class OptimizationParams(ParamGroup):
         self.bsr_v3 = False
         self.bsr_v31 = False
         self.bsr_v32 = False
+        self.bsr_v33 = False
         self.bsr_axis_mode = "z"
         self.bsr_num_patches_u = 1
         self.bsr_num_patches_v = 1
@@ -140,6 +141,9 @@ class OptimizationParams(ParamGroup):
         self.bsr_floater_distance_loss = False
         self.bsr_floater_opacity_min = 0.0
         self.bsr_isolate_densification = False
+        self.bsr_surface_loss_lambda = 1.0
+        self.bsr_floater_roi_candidates = False
+        self.bsr_floater_visible_only = False
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):
