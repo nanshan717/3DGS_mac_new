@@ -1,5 +1,8 @@
 # BR-GS v3 experiment protocol
 
+> Historical v3 protocol. The frozen final candidate is v3.4; use
+> `docs/BRGS_V34_FROZEN_PROTOCOL.md` for new experiments.
+
 ## Compatible workflow
 
 The existing conversion, rendering, and metric commands remain valid. Vanilla:
