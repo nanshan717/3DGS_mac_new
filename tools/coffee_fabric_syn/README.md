@@ -127,3 +127,24 @@ normalized Bernstein-surface distance margin, and satisfy the ground-ROI consens
 multiple training views. A hard maximum removal fraction is enforced. The resolved
 thresholds and before/after counts are written to `bsr_v34_pruning.json`; densification
 and BR-GS regularization are disabled after pruning.
+
+## P02 frozen validation candidate
+
+P02 is a new scene design, not P01 with a renamed random seed. It uses seed 202, a
+continuous undulating surface, mild directional slope, 15 independently placed and scaled
+plants, and medium weed occlusion. P01 remains the development scene; do not change the
+frozen BR-GS v3.4 preset after observing P02.
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender --background \
+  --python tools/coffee_fabric_syn/generate_blender_scene.py -- \
+  --output data/CoffeeFabric-Syn/prototype --seed 202 \
+  --scene-profile p02 --dataset-version v7 --views 96 \
+  --coffee-asset assets/coffee/a_coffee_tree/a_coffee_tree.glb \
+  --asset-license CC-BY-4.0 --engine CYCLES \
+  --preview-resolution 800 --preview-samples 48 \
+  --render-dataset --dataset-resolution 800 --dataset-samples 48
+```
+
+Render its ROI masks and validate the trainable structure exactly as for P01. P02 is a
+validation candidate, not the final hidden test set.
