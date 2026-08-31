@@ -4,6 +4,10 @@ CoffeeFabric-Syn is a scene-level benchmark for reconstructing protective agricu
 fabric beneath occluding coffee plants. Synthetic data supplements, but does not replace,
 a small real capture set.
 
+Oracle mesh evaluation follows `docs/GT_GEOMETRY_EVALUATION_PROTOCOL.md`. The existing
+Bernstein post-fit scores are proxy diagnostics and must be reported separately from
+ground-truth Accuracy, Completeness, Chamfer, and F-score.
+
 Create a deterministic fabric layout and camera plan with:
 
 ```bash
