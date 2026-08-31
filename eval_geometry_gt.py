@@ -50,16 +50,28 @@ def load_gaussians(path: Path) -> Tuple[np.ndarray, np.ndarray]:
     return xyz, opacity
 
 
+def triangulate_faces(raw_faces) -> np.ndarray:
+    triangles = []
+    for raw_face in raw_faces:
+        face = list(raw_face)
+        if len(face) < 3:
+            continue
+        # Blender PLY exports may preserve quads/ngons. A deterministic fan is
+        # sufficient because the generated fabric faces are planar locally.
+        triangles.extend((face[0], face[index], face[index + 1])
+                         for index in range(1, len(face) - 1))
+    if not triangles:
+        raise ValueError("Ground-truth mesh has no valid polygon faces")
+    return np.asarray(triangles, dtype=np.int64)
+
+
 def load_triangle_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
     ply = PlyData.read(str(path))
     vertex = ply["vertex"]
     vertices = np.column_stack([vertex[name] for name in ("x", "y", "z")]).astype(np.float32)
     if "face" not in ply:
-        raise ValueError(f"Ground truth must contain triangle faces: {path}")
-    raw_faces = ply["face"].data["vertex_indices"]
-    if any(len(face) != 3 for face in raw_faces):
-        raise ValueError("Only triangular ground-truth meshes are supported")
-    return vertices, np.asarray([list(face) for face in raw_faces], dtype=np.int64)
+        raise ValueError(f"Ground truth must contain polygon faces: {path}")
+    return vertices, triangulate_faces(ply["face"].data["vertex_indices"])
 
 
 def sample_mesh_uniform(vertices: np.ndarray, faces: np.ndarray, count: int, seed: int) -> np.ndarray:

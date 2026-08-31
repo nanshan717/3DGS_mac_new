@@ -4,8 +4,9 @@ This protocol is frozen before reporting oracle geometry results. It applies onl
 synthetic scenes with a metric `ground_truth/fabric_mesh.ply`; it must not be used for
 real captures without a registered reference scan.
 
-The evaluator samples 250,000 points from mesh triangles in proportion to surface area
-with seed 3401. Reconstructed Gaussian centres must have opacity at least 0.05, lie in
+The evaluator deterministically fan-triangulates any Blender polygon faces, then samples
+250,000 points from triangles in proportion to surface area with seed 3401. Reconstructed
+Gaussian centres must have opacity at least 0.05, lie in
 the GT horizontal support (2 cm tolerance), and lie no more than 15 cm above the local
 fabric height. The upper bound excludes coffee canopy centres; points arbitrarily far
 below the fabric remain included and are penalised. Candidate centres are averaged in a

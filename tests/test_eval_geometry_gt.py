@@ -2,7 +2,10 @@ import unittest
 
 import numpy as np
 
-from eval_geometry_gt import evaluate, sample_mesh_uniform, select_fabric_candidates, voxel_downsample
+from eval_geometry_gt import (
+    evaluate, sample_mesh_uniform, select_fabric_candidates, triangulate_faces,
+    voxel_downsample,
+)
 
 
 class GroundTruthGeometryTest(unittest.TestCase):
@@ -27,6 +30,10 @@ class GroundTruthGeometryTest(unittest.TestCase):
         first = sample_mesh_uniform(self.vertices, self.faces, 128, 11)
         second = sample_mesh_uniform(self.vertices, self.faces, 128, 11)
         np.testing.assert_array_equal(first, second)
+
+    def test_quad_is_fan_triangulated(self):
+        triangles = triangulate_faces([[0, 1, 2, 3]])
+        np.testing.assert_array_equal(triangles, [[0, 1, 2], [0, 2, 3]])
 
     def test_voxel_downsampling_averages_duplicate_density(self):
         points = np.array([[0.001, 0, 0], [0.002, 0, 0], [0.020, 0, 0]], dtype=np.float32)
