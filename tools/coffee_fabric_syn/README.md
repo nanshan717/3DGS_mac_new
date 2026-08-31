@@ -128,6 +128,10 @@ multiple training views. A hard maximum removal fraction is enforced. The resolv
 thresholds and before/after counts are written to `bsr_v34_pruning.json`; densification
 and BR-GS regularization are disabled after pruning.
 
+The experimental `--bsr_v35` preset retains this pruning stage and adds bounded,
+photometrically guarded weak surface recovery. See
+`docs/BRGS_V35_DEVELOPMENT_PROTOCOL.md` for its safeguards and split protocol.
+
 ## P02 frozen validation candidate
 
 P02 is a new scene design, not P01 with a renamed random seed. It uses seed 202, a

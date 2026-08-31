@@ -5,7 +5,9 @@ import torch
 from utils.bernstein_utils import (
     bernstein_control_regularization,
     bernstein_surface_distance_loss,
+    clamp_bounded_displacement_,
     evaluate_bernstein_surface,
+    reconstruction_guard,
 )
 
 
@@ -115,6 +117,42 @@ class BernsteinV3Tests(unittest.TestCase):
         self.assertIsNotNone(opacity.grad)
         self.assertGreater(float(opacity.grad), 0.0)
         self.assertTrue(points.grad is None or torch.equal(points.grad, torch.zeros_like(points)))
+
+    def test_v35_reconstruction_guard(self):
+        self.assertTrue(reconstruction_guard(1.029, 1.0, 0.03))
+        self.assertFalse(reconstruction_guard(1.031, 1.0, 0.03))
+        self.assertTrue(reconstruction_guard(5.0, None, 0.03))
+
+    def test_v35_bounded_displacement_only_changes_selected_points(self):
+        xyz = torch.tensor([[0.02, 0.0, 0.0], [0.02, 0.0, 0.0]])
+        anchor = torch.zeros_like(xyz)
+        mask = torch.tensor([True, False])
+        maximum = clamp_bounded_displacement_(xyz, anchor, mask, 0.005)
+        self.assertAlmostEqual(maximum, 0.005, places=7)
+        self.assertAlmostEqual(float(xyz[0, 0]), 0.005, places=7)
+        self.assertAlmostEqual(float(xyz[1, 0]), 0.02, places=7)
+
+    def test_v35_frozen_surface_moves_only_gaussian_centres(self):
+        x = torch.linspace(-1, 1, 4)
+        y = torch.linspace(-1, 1, 4)
+        xx, yy = torch.meshgrid(x, y, indexing="ij")
+        cp = torch.stack((xx, yy, torch.zeros_like(xx)), dim=-1).requires_grad_(True)
+        points = torch.tensor([[0.0, 0.0, 0.02]], requires_grad=True)
+        loss, _ = bernstein_surface_distance_loss(
+            points,
+            cp.detach(),
+            point_weights=torch.ones(1),
+            samples_u=8,
+            samples_v=8,
+            robust_delta=0.02,
+            surface_deadzone=0.003,
+            surface_one_sided=True,
+            surface_normal=torch.tensor([0.0, 0.0, 1.0]),
+            surface_loss_lambda=1.0,
+        )
+        loss.backward()
+        self.assertIsNone(cp.grad)
+        self.assertGreater(float(points.grad[0, 2]), 0.0)
 
 
 if __name__ == "__main__":

@@ -316,3 +316,20 @@ def bernstein_surface_distance_loss(
     debug["control_smoothness_loss"] = float(control_smoothness.detach().item())
     debug["patch_continuity_loss"] = float(patch_continuity.detach().item())
     return loss, debug
+
+def reconstruction_guard(current_loss, reference_loss, tolerance):
+    """Return whether a recovery step stays within the frozen photometric budget."""
+    if reference_loss is None or reference_loss <= 0:
+        return True
+    return float(current_loss) <= float(reference_loss) * (1.0 + float(tolerance))
+
+
+def clamp_bounded_displacement_(xyz, anchor_xyz, mask, max_displacement):
+    """Project selected centres into a metric ball around their post-pruning anchors."""
+    if anchor_xyz is None or mask is None or not bool(mask.any()) or max_displacement <= 0:
+        return 0.0
+    delta = xyz[mask] - anchor_xyz[mask]
+    norms = torch.linalg.norm(delta, dim=1, keepdim=True)
+    scale = (float(max_displacement) / norms.clamp_min(1e-12)).clamp_max(1.0)
+    xyz[mask] = anchor_xyz[mask] + delta * scale
+    return float(torch.linalg.norm(xyz[mask] - anchor_xyz[mask], dim=1).max().item())

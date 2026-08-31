@@ -13,7 +13,10 @@ import os
 import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim
-from utils.bernstein_utils import bernstein_surface_distance_loss, evaluate_bernstein_surface
+from utils.bernstein_utils import (
+    bernstein_surface_distance_loss, clamp_bounded_displacement_,
+    evaluate_bernstein_surface, reconstruction_guard,
+)
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -93,6 +96,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     ema_loss_for_log = 0.0
     ema_Ll1depth_for_log = 0.0
     ema_Lbsr_for_log = 0.0
+    ema_reconstruction_for_guard = 0.0
+    recovery_reference_loss = None
+    recovery_anchor_xyz = None
+    recovery_mask = None
+    recovery_applied_steps = 0
+    recovery_skipped_steps = 0
+    recovery_max_displacement = 0.0
 
     def get_bsr_weight(iteration):
         if not opt.use_bsr:
@@ -133,6 +143,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         if opt.bsr_prune_iter > 0 and iteration == opt.bsr_prune_iter:
             run_bsr_geometry_pruning(gaussians, scene, dataset, opt, iteration)
+            if opt.bsr_v35:
+                recovery_anchor_xyz = gaussians.get_xyz.detach().clone()
+                recovery_opacity = gaussians.get_opacity.detach().reshape(-1)
+                recovery_mask = (
+                    (recovery_opacity >= float(opt.bsr_recovery_opacity_min))
+                    & (recovery_opacity <= float(opt.bsr_recovery_opacity_max))
+                )
+                recovery_reference_loss = max(float(ema_reconstruction_for_guard), 1e-8)
 
         gaussians.update_learning_rate(iteration)
 
@@ -175,6 +193,24 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         Lbsr = torch.tensor(0.0, device="cuda")
         bsr_debug = {"num_bsr_points": 0, "mean_distance": 0.0}
         bsr_weight = get_bsr_weight(iteration)
+        guarded_reconstruction_loss = (
+            0.4 * reconstruction_loss.detach().item()
+            + 0.6 * ema_reconstruction_for_guard
+        )
+        recovery_active = bool(
+            opt.bsr_v35 and iteration >= opt.bsr_prune_iter
+            and reconstruction_guard(
+                guarded_reconstruction_loss, recovery_reference_loss,
+                opt.bsr_recovery_loss_tolerance,
+            )
+        )
+        if opt.bsr_v35 and iteration >= opt.bsr_prune_iter:
+            if recovery_active:
+                bsr_weight = float(opt.bsr_recovery_lambda)
+                recovery_applied_steps += 1
+            else:
+                bsr_weight = 0.0
+                recovery_skipped_steps += 1
         if bsr_weight > 0.0 and gaussians.has_bernstein_surface:
             refinement_active = opt.bsr_refine_start < 0 or iteration >= opt.bsr_refine_start
             bsr_weights = gaussians.get_bsr_soft_weights(
@@ -183,6 +219,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 opt.bsr_z_softness,
                 opt.bsr_min_weight,
             )
+            if recovery_active and recovery_mask is not None:
+                bsr_weights = bsr_weights * recovery_mask.to(bsr_weights.dtype)
             roi_weights = None
             if dataset.bsr_roi_dir:
                 if viewpoint_cam.roi_mask is None and dataset.bsr_roi_required:
@@ -221,7 +259,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 floater_weights = floater_weights * visible_weights
             Lbsr, bsr_debug = bernstein_surface_distance_loss(
                 gaussians.get_xyz,
-                gaussians.get_bernstein_control_points,
+                (
+                    gaussians.get_bernstein_control_points.detach()
+                    if recovery_active else gaussians.get_bernstein_control_points
+                ),
                 point_weights=bsr_weights,
                 opacities=gaussians.get_opacity,
                 samples_u=opt.bsr_surface_samples_u,
@@ -230,12 +271,22 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 robust_delta=opt.bsr_robust_delta,
                 density_k=opt.bsr_density_k,
                 density_blend=opt.bsr_density_blend,
-                floater_lambda=opt.bsr_floater_lambda if refinement_active else 0.0,
+                floater_lambda=(
+                    0.0 if recovery_active
+                    else opt.bsr_floater_lambda if refinement_active else 0.0
+                ),
                 floater_margin=opt.bsr_floater_margin,
                 support_scale=gaussians._bsr_support_scale.item() if opt.bsr_normalize_distance else 1.0,
-                coverage_lambda=opt.bsr_coverage_lambda if refinement_active else 0.0,
-                control_smoothness_lambda=opt.bsr_control_smoothness_lambda,
-                patch_continuity_lambda=opt.bsr_patch_continuity_lambda,
+                coverage_lambda=(
+                    0.0 if recovery_active
+                    else opt.bsr_coverage_lambda if refinement_active else 0.0
+                ),
+                control_smoothness_lambda=(
+                    0.0 if recovery_active else opt.bsr_control_smoothness_lambda
+                ),
+                patch_continuity_lambda=(
+                    0.0 if recovery_active else opt.bsr_patch_continuity_lambda
+                ),
                 spatial_sampling=opt.bsr_spatial_sampling,
                 frame_origin=gaussians._bsr_frame_origin,
                 frame_u=gaussians._bsr_frame_u,
@@ -243,12 +294,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 floater_points=gaussians.get_xyz,
                 floater_weights=floater_weights,
                 floater_opacities=gaussians.get_opacity,
-                surface_deadzone=opt.bsr_surface_deadzone,
-                surface_one_sided=opt.bsr_surface_one_sided,
+                surface_deadzone=(0.003 if recovery_active else opt.bsr_surface_deadzone),
+                surface_one_sided=(True if recovery_active else opt.bsr_surface_one_sided),
                 surface_normal=gaussians._bsr_frame_normal,
                 floater_distance_loss=opt.bsr_floater_distance_loss,
                 floater_opacity_min=opt.bsr_floater_opacity_min,
-                surface_loss_lambda=opt.bsr_surface_loss_lambda,
+                surface_loss_lambda=(1.0 if recovery_active else opt.bsr_surface_loss_lambda),
             )
             loss = loss + bsr_weight * Lbsr
 
@@ -282,6 +333,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
             ema_Ll1depth_for_log = 0.4 * Ll1depth + 0.6 * ema_Ll1depth_for_log
             ema_Lbsr_for_log = 0.4 * Lbsr.item() + 0.6 * ema_Lbsr_for_log
+            ema_reconstruction_for_guard = (
+                0.4 * reconstruction_loss.detach().item() + 0.6 * ema_reconstruction_for_guard
+            )
 
             if iteration % 10 == 0:
                 progress_bar.set_postfix({
@@ -342,6 +396,36 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 else:
                     gaussians.optimizer.step()
                     gaussians.optimizer.zero_grad(set_to_none = True)
+                if opt.bsr_v35 and recovery_anchor_xyz is not None:
+                    recovery_max_displacement = max(
+                        recovery_max_displacement,
+                        clamp_bounded_displacement_(
+                            gaussians._xyz, recovery_anchor_xyz, recovery_mask,
+                            opt.bsr_recovery_max_displacement,
+                        ),
+                    )
+
+            if opt.bsr_v35 and iteration == opt.iterations:
+                recovery_audit = {
+                    "schema": "brgs-v35-recovery-v1",
+                    "reference_reconstruction_loss": recovery_reference_loss,
+                    "applied_steps": recovery_applied_steps,
+                    "skipped_steps": recovery_skipped_steps,
+                    "eligible_points": int(recovery_mask.sum().item()) if recovery_mask is not None else 0,
+                    "total_points_after_pruning": int(recovery_mask.numel()) if recovery_mask is not None else 0,
+                    "max_displacement_m": recovery_max_displacement,
+                    "configured_max_displacement_m": float(opt.bsr_recovery_max_displacement),
+                    "loss_tolerance": float(opt.bsr_recovery_loss_tolerance),
+                    "opacity_range": [
+                        float(opt.bsr_recovery_opacity_min),
+                        float(opt.bsr_recovery_opacity_max),
+                    ],
+                    "surface_deadzone_m": 0.003,
+                    "surface_one_sided": True,
+                    "surface_reference_frozen": True,
+                }
+                with open(os.path.join(dataset.model_path, "bsr_v35_recovery.json"), "w", encoding="utf-8") as f:
+                    json.dump(recovery_audit, f, indent=2, ensure_ascii=False)
 
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
@@ -709,6 +793,31 @@ def apply_bsr_v34_preset(args):
         "[BR-GS v3.4] Applied two-stage geometry pruning preset; densification stops at pruning."
     )
 
+
+def apply_bsr_v35_preset(args):
+    """v3.4 pruning plus bounded, photometrically guarded surface recovery."""
+    if not args.bsr_v35:
+        return
+    if args.bsr_v3 or args.bsr_v31 or args.bsr_v32 or args.bsr_v33 or args.bsr_v34:
+        raise ValueError("Choose only one BR-GS preset, including --bsr_v35")
+    explicit = {token.split("=", 1)[0] for token in sys.argv[1:] if token.startswith("--")}
+
+    def preset(name, value):
+        if f"--{name}" not in explicit:
+            setattr(args, name, value)
+
+    args.bsr_v34 = True
+    apply_bsr_v34_preset(args)
+    args.bsr_v34 = False
+    args.bsr_v35 = True
+    args.bsr_disable_after_prune = False
+    preset("bsr_recovery_lambda", 0.0002)
+    preset("bsr_recovery_opacity_min", 0.05)
+    preset("bsr_recovery_opacity_max", 0.20)
+    preset("bsr_recovery_max_displacement", 0.005)
+    preset("bsr_recovery_loss_tolerance", 0.03)
+    print("[BR-GS v3.5] Applied bounded post-pruning surface recovery with photometric guard.")
+
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, train_test_exp):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -773,6 +882,7 @@ if __name__ == "__main__":
     apply_bsr_v32_preset(args)
     apply_bsr_v33_preset(args)
     apply_bsr_v34_preset(args)
+    apply_bsr_v35_preset(args)
     args.save_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)

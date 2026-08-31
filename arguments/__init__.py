@@ -125,6 +125,7 @@ class OptimizationParams(ParamGroup):
         self.bsr_v32 = False
         self.bsr_v33 = False
         self.bsr_v34 = False
+        self.bsr_v35 = False
         self.bsr_axis_mode = "z"
         self.bsr_num_patches_u = 1
         self.bsr_num_patches_v = 1
@@ -154,6 +155,12 @@ class OptimizationParams(ParamGroup):
         self.bsr_prune_min_valid_views = 2
         self.bsr_prune_max_fraction = 0.05
         self.bsr_disable_after_prune = False
+        # v3.5 bounded, reconstruction-guarded post-pruning recovery.
+        self.bsr_recovery_lambda = 0.0002
+        self.bsr_recovery_opacity_min = 0.05
+        self.bsr_recovery_opacity_max = 0.20
+        self.bsr_recovery_max_displacement = 0.005
+        self.bsr_recovery_loss_tolerance = 0.03
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):
