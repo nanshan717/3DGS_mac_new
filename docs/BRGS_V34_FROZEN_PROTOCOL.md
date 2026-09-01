@@ -2,12 +2,17 @@
 
 ## Status
 
-BR-GS v3.4 is the frozen algorithm candidate. The implementation is enabled only by
-`--bsr_v34`; do not tune its defaults against P01 or any future held-out test scene.
+BR-GS v3.4 is the frozen final algorithm version for the paper. The implementation is
+enabled only by `--bsr_v34`; do not tune its defaults against P01, P02, or any future
+held-out test scene. BR-GS v3.5 is retained only as a negative/development ablation.
 
 P01 V7 (`P01_flat_low_occlusion_v7_balanced96`) is a **development scene** because its
 12 evaluation views were repeatedly inspected while developing v3.1--v3.4. Its results
 are evidence that the method is viable, not an unbiased final benchmark result.
+
+P02 V7 (`P02_undulating_medium_occlusion_v7_balanced96`) is also a **development scene**
+because its results were inspected before the final-version decision. Neither P01 nor P02
+may be relabeled as held-out performance.
 
 ## Frozen defaults
 
@@ -48,13 +53,15 @@ reported as a development study or ablation with that designation.
 
 ## Required final validation
 
-1. Generate scene-level validation and held-out test scenes with new seeds and geometry.
-2. Freeze the test scenes before any training result is inspected.
-3. Run official 3DGS and BR-GS v3.4 with seeds 0, 1, and 2.
-4. Report mean and standard deviation for image, geometry, point-count, time, and memory
+1. Complete the declared P01/P02 three-seed development matrix without further tuning.
+2. Generate scene-level validation and held-out P03/P04 scenes with new seeds and geometry.
+3. Freeze P03/P04 manifests, images, masks, camera splits, GT meshes, and checksums before
+   any baseline or BR-GS result is inspected.
+4. Run official 3DGS and BR-GS v3.4 with seeds 0, 1, and 2.
+5. Report mean and standard deviation for image, geometry, point-count, time, and memory
    metrics; retain per-run JSON files.
-5. Include official 3DGS, 2DGS, and at least one geometry-focused Gaussian baseline.
-6. Evaluate real coffee-field captures separately and label synthetic and real results.
+6. Include official 3DGS, 2DGS, and at least one geometry-focused Gaussian baseline.
+7. Evaluate real coffee-field captures separately and label synthetic and real results.
 
 ## Seeded BR-GS command
 

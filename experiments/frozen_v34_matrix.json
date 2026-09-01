@@ -1,0 +1,36 @@
+{
+  "schema": "brgs-frozen-v34-matrix-v1",
+  "status": "frozen",
+  "iterations": 15000,
+  "resolution": 1,
+  "seeds": [0, 1, 2],
+  "brgs_repo": "/home/featurize/work/3DGS_mac_new",
+  "official_repo": "/home/featurize/work/gaussian-splatting-p01-compat",
+  "scenes": {
+    "P01": {
+      "role": "development",
+      "source": "/home/featurize/work/3DGS_mac_new/data/CoffeeFabric-Syn/prototype/P01_flat_low_occlusion_v7_balanced96"
+    },
+    "P02": {
+      "role": "development",
+      "source": "/home/featurize/work/3DGS_mac_new/data/CoffeeFabric-Syn/prototype/P02_undulating_medium_occlusion_v7_balanced96"
+    }
+  },
+  "methods": {
+    "official_3dgs": {
+      "repo": "official_repo",
+      "output_pattern": "output/{scene}_official_3dgs_15k_s{seed}",
+      "train_flags": []
+    },
+    "brgs_v34": {
+      "repo": "brgs_repo",
+      "output_pattern": "output/{scene}_brgs_v34_15k_s{seed}",
+      "train_flags": ["--bsr_v34"]
+    }
+  },
+  "notes": [
+    "P01 and P02 are development scenes because their results were inspected during method development.",
+    "The v3.4 defaults are frozen; do not add threshold overrides to this matrix.",
+    "Official 3DGS may receive only the documented image-loader and RNG-control compatibility changes."
+  ]
+}
