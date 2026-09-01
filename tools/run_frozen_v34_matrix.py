@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shlex
 import subprocess
@@ -29,6 +30,36 @@ def selected(values, requested):
 
 def quote(command) -> str:
     return " ".join(shlex.quote(str(token)) for token in command)
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def write_run_manifest(matrix: dict, scene_id: str, method_id: str, seed: int,
+                       repo: Path, output: Path, train_command) -> None:
+    """Record runner-level arguments that upstream official cfg_args omits."""
+    source = Path(matrix["scenes"][scene_id]["source"]).resolve()
+    payload = {
+        "schema": "brgs-frozen-v34-run-v1",
+        "matrix_schema": matrix["schema"],
+        "scene": scene_id,
+        "method": method_id,
+        "seed": seed,
+        "iterations": int(matrix["iterations"]),
+        "resolution": int(matrix["resolution"]),
+        "source_path": str(source),
+        "model_path": str(output.resolve()),
+        "train_command": [str(token) for token in train_command],
+        "train_completed": True,
+        "train_py_sha256": sha256(repo / "train.py"),
+    }
+    patch_audit = repo / "REPRODUCIBILITY_PATCH.json"
+    if patch_audit.is_file():
+        payload["reproducibility_patch_sha256"] = sha256(patch_audit)
+    (output / "frozen_run_manifest.json").write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def preflight(matrix: dict) -> None:
@@ -109,6 +140,8 @@ def main() -> None:
                             f"Refusing to train into existing directory {output}; choose a clean matrix output"
                         )
                     subprocess.run(command, cwd=repo, check=True)
+                    if stage == "train":
+                        write_run_manifest(matrix, scene, method, seed, repo, output, command)
 
 
 if __name__ == "__main__":

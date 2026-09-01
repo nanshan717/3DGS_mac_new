@@ -53,6 +53,22 @@ def cfg_field(text: str, name: str):
 
 
 def run_config(path: Path) -> dict:
+    frozen_manifest = path / "frozen_run_manifest.json"
+    if frozen_manifest.is_file():
+        payload = read_json(frozen_manifest)
+        if payload.get("schema") != "brgs-frozen-v34-run-v1" or not payload.get("train_completed"):
+            raise ValueError(f"Invalid frozen run manifest in {path}")
+        return {
+            "source_path": payload.get("source_path"),
+            "seed": payload.get("seed"),
+            "iterations": payload.get("iterations"),
+            "argv": payload.get("train_command", []),
+            "seed_provenance": "frozen_run_manifest",
+            "scene": payload.get("scene"),
+            "method": payload.get("method"),
+            "model_path": payload.get("model_path"),
+            "resolution": payload.get("resolution"),
+        }
     manifest = path / "experiment_manifest.json"
     if manifest.is_file():
         payload = read_json(manifest)
@@ -63,6 +79,11 @@ def run_config(path: Path) -> dict:
             "seed": dataset.get("seed"),
             "iterations": optimization.get("iterations"),
             "argv": payload.get("argv", []),
+            "seed_provenance": "experiment_manifest",
+            "scene": None,
+            "method": None,
+            "model_path": None,
+            "resolution": None,
         }
     cfg = path / "cfg_args"
     if not cfg.is_file():
@@ -73,6 +94,11 @@ def run_config(path: Path) -> dict:
         "seed": cfg_field(text, "seed"),
         "iterations": cfg_field(text, "iterations"),
         "argv": [],
+        "seed_provenance": "cfg_args",
+        "scene": None,
+        "method": None,
+        "model_path": None,
+        "resolution": None,
     }
 
 
@@ -84,8 +110,26 @@ def load_run(matrix: dict, scene_id: str, method_id: str, seed: int) -> dict:
     iteration = int(matrix["iterations"])
     source = str(Path(matrix["scenes"][scene_id]["source"]).resolve())
     config = run_config(model)
+    if config["scene"] is not None and config["scene"] != scene_id:
+        raise ValueError(f"Scene metadata mismatch for {model}: {config['scene']} != {scene_id}")
+    if config["method"] is not None and config["method"] != method_id:
+        raise ValueError(f"Method metadata mismatch for {model}: {config['method']} != {method_id}")
+    if config["model_path"] is not None and Path(config["model_path"]).resolve() != model:
+        raise ValueError(f"Model-path metadata mismatch for {model}")
+    if config["resolution"] is not None and int(config["resolution"]) != int(matrix["resolution"]):
+        raise ValueError(f"Resolution metadata mismatch for {model}")
     if str(Path(config["source_path"]).resolve()) != source:
         raise ValueError(f"Source mismatch for {model}: {config['source_path']} != {source}")
+    # Upstream official 3DGS cfg_args does not serialize train.py's top-level
+    # RNG flags.  The compatibility checkout defaults to seed 0, so only the
+    # already-completed legacy seed-0 run can be recovered without a runner
+    # manifest.  Nonzero seeds always require explicit metadata.
+    if config["seed"] is None and method_id == "official_3dgs" and seed == 0:
+        patch_audit = repo / "REPRODUCIBILITY_PATCH.json"
+        if not patch_audit.is_file():
+            raise ValueError(f"Cannot verify legacy official seed 0 without {patch_audit}")
+        config["seed"] = 0
+        config["seed_provenance"] = "official_compat_default_seed0"
     if config["seed"] is None or int(config["seed"]) != seed:
         raise ValueError(f"Seed metadata mismatch for {model}: {config['seed']} != {seed}")
     if config["iterations"] is not None and int(config["iterations"]) != iteration:
@@ -104,6 +148,7 @@ def load_run(matrix: dict, scene_id: str, method_id: str, seed: int) -> dict:
         "role": matrix["scenes"][scene_id]["role"],
         "method": method_id,
         "seed": seed,
+        "seed_provenance": config["seed_provenance"],
         "model_path": str(model),
         "psnr": float(render["PSNR"]),
         "ssim": float(render["SSIM"]),

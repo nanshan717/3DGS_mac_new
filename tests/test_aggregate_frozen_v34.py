@@ -3,10 +3,29 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.aggregate_frozen_v34 import load_run, summarize
+from tools.aggregate_frozen_v34 import load_run, run_config, summarize
 
 
 class AggregateFrozenV34Tests(unittest.TestCase):
+    def test_frozen_runner_manifest_has_priority(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            model = Path(raw_tmp)
+            (model / "frozen_run_manifest.json").write_text(json.dumps({
+                "schema": "brgs-frozen-v34-run-v1",
+                "source_path": "/dataset/P01",
+                "seed": 2,
+                "iterations": 15000,
+                "scene": "P01",
+                "method": "official_3dgs",
+                "model_path": str(model),
+                "resolution": 1,
+                "train_command": ["python", "train.py", "--seed", "2"],
+                "train_completed": True,
+            }), encoding="utf-8")
+            config = run_config(model)
+            self.assertEqual(config["seed"], 2)
+            self.assertEqual(config["seed_provenance"], "frozen_run_manifest")
+
     def test_summary_uses_sample_standard_deviation(self):
         rows = []
         for seed, psnr in enumerate((10.0, 11.0, 12.0)):
