@@ -152,3 +152,17 @@ frozen BR-GS v3.4 preset after observing P02.
 
 Render its ROI masks and validate the trainable structure exactly as for P01. P02 is a
 validation candidate, not the final hidden test set.
+
+## P03/P04 pre-registered held-out scenes
+
+P03 and P04 are the first scene-level held-out evaluation pair. Their specifications live
+in `tools/coffee_fabric_syn/heldout_profiles.py`: P03 uses seed 303, cross-slope terrain,
+transverse wrinkles and high occlusion; P04 uses seed 404, piecewise crossfall, a local
+uplift/edge sag and mixed occlusion. These values must not be changed after any P03/P04
+reconstruction is trained or evaluated.
+
+Generate both complete RGB datasets with the commands in
+`docs/HELDOUT_V34_EXPERIMENT_PROTOCOL.md`. Render the ROI masks from the generated `.blend`
+files, validate both structures, then run `tools/freeze_heldout_v34.py`. The held-out matrix
+is deliberately marked `preregistered` until this freeze succeeds, and the matrix runner
+will refuse to train it in that state.

@@ -33,7 +33,29 @@ def quote(command) -> str:
 
 
 def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_heldout_lock(source: Path, expected_hash: str) -> None:
+    lock_path = source / "HELDOUT_FREEZE.json"
+    if not lock_path.is_file() or sha256(lock_path) != expected_hash:
+        raise ValueError(f"Held-out dataset lock mismatch: {lock_path}")
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    checksum_path = source / "SHA256SUMS"
+    if sha256(checksum_path) != lock.get("sha256sums_sha256"):
+        raise ValueError(f"Held-out checksum manifest changed after freeze: {checksum_path}")
+    lines = checksum_path.read_text(encoding="utf-8").splitlines()
+    if len(lines) != int(lock.get("file_count", -1)):
+        raise ValueError(f"Held-out file count mismatch: {source}")
+    for line in lines:
+        expected, relative = line.split(maxsplit=1)
+        path = source / relative
+        if not path.is_file() or sha256(path) != expected:
+            raise ValueError(f"Frozen held-out artifact changed: {path}")
 
 
 def write_run_manifest(matrix: dict, scene_id: str, method_id: str, seed: int,
@@ -83,6 +105,11 @@ def preflight(matrix: dict) -> None:
                          "ground_truth/fabric_mesh.ply"):
             if not (source / relative).is_file():
                 raise FileNotFoundError(source / relative)
+        if scene.get("role") == "held_out":
+            expected_lock = scene.get("dataset_lock_sha256")
+            if not expected_lock:
+                raise ValueError(f"Held-out scene has no dataset lock: {source}")
+            verify_heldout_lock(source, expected_lock)
 
 
 def commands_for(matrix: dict, scene_id: str, method_id: str, seed: int):
@@ -107,9 +134,9 @@ def main() -> None:
     default_matrix = Path(__file__).resolve().parents[1] / "experiments" / "frozen_v34_matrix.json"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=default_matrix)
-    parser.add_argument("--scene", action="append", choices=["P01", "P02"])
-    parser.add_argument("--method", action="append", choices=["official_3dgs", "brgs_v34"])
-    parser.add_argument("--seed", action="append", type=int, choices=[0, 1, 2])
+    parser.add_argument("--scene", action="append", help="Scene ID declared by the selected matrix")
+    parser.add_argument("--method", action="append", help="Method ID declared by the selected matrix")
+    parser.add_argument("--seed", action="append", type=int, help="Seed declared by the selected matrix")
     parser.add_argument("--stage", action="append", choices=["train", "render", "metrics", "geometry"])
     parser.add_argument("--execute", action="store_true", help="Execute instead of print")
     parser.add_argument("--skip_preflight", action="store_true", help="Print plans on a non-server host")
@@ -118,6 +145,14 @@ def main() -> None:
     args = parser.parse_args()
 
     matrix = load_matrix(args.matrix.expanduser().resolve())
+    invalid_scenes = set(args.scene or ()) - set(matrix["scenes"])
+    invalid_methods = set(args.method or ()) - set(matrix["methods"])
+    invalid_seeds = set(args.seed or ()) - set(matrix["seeds"])
+    if invalid_scenes or invalid_methods or invalid_seeds:
+        raise ValueError(
+            f"Selection is outside the matrix: scenes={sorted(invalid_scenes)}, "
+            f"methods={sorted(invalid_methods)}, seeds={sorted(invalid_seeds)}"
+        )
     if not args.skip_preflight:
         preflight(matrix)
     scenes = selected(list(matrix["scenes"]), args.scene)

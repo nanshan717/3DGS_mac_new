@@ -6,9 +6,10 @@ BR-GS v3.4 is frozen as the paper's final method. No loss, threshold, pruning, s
 ROI, densification, or recovery parameter may be changed after this point. BR-GS v3.5 is
 a recorded negative/development ablation and is not advanced as the final method.
 
-P01 and P02 are development scenes. The first formal task is a clean, matched three-seed
-matrix on these scenes. P03/P04 will be generated and checksum-frozen only after this
-matrix is complete; their results may not be used to tune v3.4.
+P01 and P02 are development scenes. Their clean, matched three-seed matrix is complete
+(12/12 validated runs). P03/P04 are separately pre-registered in
+`experiments/heldout_v34_matrix.json`; they become executable only after both datasets are
+checksum-frozen. Their results may not be used to tune v3.4.
 
 The machine-readable declaration is `experiments/frozen_v34_matrix.json`.
 

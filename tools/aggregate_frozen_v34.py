@@ -10,6 +10,11 @@ import re
 import statistics
 from pathlib import Path
 
+try:
+    from tools.run_frozen_v34_matrix import verify_heldout_lock
+except ModuleNotFoundError:  # Direct execution via python tools/aggregate_frozen_v34.py.
+    from run_frozen_v34_matrix import verify_heldout_lock
+
 
 METRICS = (
     "psnr", "ssim", "lpips", "points",
@@ -253,6 +258,12 @@ def main() -> None:
         raise ValueError("Expected a frozen brgs-frozen-v34-matrix-v1 file")
     if matrix.get("seeds") != [0, 1, 2] or matrix.get("iterations") != 15000:
         raise ValueError("Frozen matrix must declare seeds 0/1/2 at 15000 iterations")
+    for scene in matrix["scenes"].values():
+        if scene.get("role") == "held_out":
+            expected_lock = scene.get("dataset_lock_sha256")
+            if not expected_lock:
+                raise ValueError("Held-out aggregation requires a frozen dataset lock")
+            verify_heldout_lock(Path(scene["source"]), expected_lock)
     rows, missing = [], []
     for scene in matrix["scenes"]:
         for method in matrix["methods"]:

@@ -19,6 +19,13 @@ from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 
+# Blender's --python execution does not reliably add the script directory to
+# sys.path, while normal module imports use the repository package path.
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from heldout_profiles import HELDOUT_PROFILES, heldout_height
+
 
 SCHEMA = "coffee-fabric-syn-v1"
 SCENE_ID = "P01_flat_low_occlusion_v4_photoreal_attempt"
@@ -47,8 +54,8 @@ def arguments():
     parser.add_argument("--preview-samples", type=int, default=48)
     parser.add_argument("--views", type=int, default=48)
     parser.add_argument("--dataset-version", choices=("v6", "v7"), default="v6")
-    parser.add_argument("--scene-profile", choices=("p01", "p02"), default="p01",
-                        help="Frozen scene design; p02 is the undulating medium-occlusion validation scene")
+    parser.add_argument("--scene-profile", choices=("p01", "p02", "p03", "p04"), default="p01",
+                        help="Pre-registered scene design; p03/p04 are held-out and must be frozen before training")
     parser.add_argument("--engine", choices=("BLENDER_EEVEE", "CYCLES"), default="BLENDER_EEVEE")
     parser.add_argument("--skip-render", action="store_true", help="Rebuild/export deterministically while retaining existing previews")
     parser.add_argument("--coffee-asset", help="Downloaded CC-licensed .glb/.gltf/.fbx/.obj file or extracted directory")
@@ -332,14 +339,23 @@ def p02_height(x, y):
             + 0.018 * x)
 
 
+def surface_height_for(scene_profile):
+    if scene_profile == "p02":
+        return p02_height
+    if scene_profile in HELDOUT_PROFILES:
+        return lambda x, y: heldout_height(scene_profile, x, y)
+    return None
+
+
 def terrain_mesh(mat, rng, scene_profile="p01"):
     n, size = 45, 10.0
+    height_function = surface_height_for(scene_profile)
     verts = []
     for iy in range(n):
         y = -size / 2 + size * iy / (n - 1)
         for ix in range(n):
             x = -size / 2 + size * ix / (n - 1)
-            relief = p02_height(x, y) if scene_profile == "p02" else 0.0
+            relief = height_function(x, y) if height_function else 0.0
             z = -0.14 + relief + 0.035 * math.sin(0.8 * x) * math.cos(0.65 * y) + rng.uniform(-0.008, 0.008)
             verts.append((x, y, z))
     faces = []
@@ -358,12 +374,13 @@ def terrain_mesh(mat, rng, scene_profile="p01"):
 def fabric_mesh(mat, plant_positions=FABRIC_PLANTS, scene_profile="p01"):
     # Flat condition, but not mathematically perfect: independent multifrequency micro-relief.
     nx, ny, width, length = 141, 181, 5.0, 7.2
+    height_function = surface_height_for(scene_profile)
     verts = []
     for iy in range(ny):
         y = -length / 2 + length * iy / (ny - 1)
         for ix in range(nx):
             x = -width / 2 + width * ix / (nx - 1)
-            relief = p02_height(x, y) if scene_profile == "p02" else 0.0
+            relief = height_function(x, y) if height_function else 0.0
             z = 0.015 + relief + 0.012 * math.sin(3.7 * x + 0.3) * math.sin(2.9 * y - 0.2)
             z += 0.005 * math.sin(9.1 * x + 1.7 * y)
             edge_distance = min(x + width / 2, width / 2 - x, y + length / 2, length / 2 - y)
@@ -424,12 +441,14 @@ def protective_ring(index, x, y, mat, surface_z=0.0):
     upper.data.materials.append(mat)
 
 
-def scatter_ground_detail(rng, soil_mat, dry_leaf_mat):
+def scatter_ground_detail(rng, soil_mat, dry_leaf_mat, scene_profile="p01"):
+    height_function = surface_height_for(scene_profile)
     for i in range(90):
         x, y = rng.uniform(-3.8, 3.8), rng.uniform(-3.8, 3.8)
         if abs(x) < 2.15 and abs(y) < 3.05:
             continue
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=rng.uniform(0.018, 0.065), location=(x, y, -0.075))
+        ground_z = -0.075 + (height_function(x, y) if height_function else 0.0)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=rng.uniform(0.018, 0.065), location=(x, y, ground_z))
         pebble = bpy.context.object
         pebble.name = f"authored_soil_clod_{i:03d}"
         pebble.scale = (1.0, rng.uniform(0.65, 1.25), rng.uniform(0.35, 0.75))
@@ -438,15 +457,19 @@ def scatter_ground_detail(rng, soil_mat, dry_leaf_mat):
         x, y = rng.uniform(-3.6, 3.6), rng.uniform(-3.6, 3.6)
         if abs(x) < 1.9 and abs(y) < 2.9:
             continue
-        leaf(f"authored_dry_leaf_{i:03d}", (x, y, -0.055), (0.0, rng.uniform(-0.1, 0.1), rng.uniform(0, math.tau)),
+        ground_z = -0.055 + (height_function(x, y) if height_function else 0.0)
+        leaf(f"authored_dry_leaf_{i:03d}", (x, y, ground_z), (0.0, rng.uniform(-0.1, 0.1), rng.uniform(0, math.tau)),
              (rng.uniform(0.07, 0.12), rng.uniform(0.04, 0.065), 0.5), dry_leaf_mat)
 
 
 def scatter_weeds(rng, weed_mat, scene_profile="p01"):
     """Irregular weeds restricted mostly to row margins, matching the aerial context."""
-    patch_count = 72 if scene_profile == "p02" else 48
+    heldout = HELDOUT_PROFILES.get(scene_profile)
+    patch_count = heldout["weed_patch_count"] if heldout else (72 if scene_profile == "p02" else 48)
+    interior_stride = heldout["interior_weed_stride"] if heldout else (4 if scene_profile == "p02" else None)
+    height_function = surface_height_for(scene_profile)
     for patch in range(patch_count):
-        if scene_profile == "p02" and patch % 4 == 0:
+        if interior_stride and patch % interior_stride == 0:
             cx = rng.uniform(-2.25, 2.25)
         else:
             cx = rng.choice((-1, 1)) * rng.uniform(2.75, 4.6)
@@ -455,7 +478,7 @@ def scatter_weeds(rng, weed_mat, scene_profile="p01"):
             x, y = cx + rng.uniform(-0.22, 0.22), cy + rng.uniform(-0.22, 0.22)
             h = rng.uniform(0.08, 0.30)
             angle = rng.uniform(0, math.tau)
-            ground_z = (-0.08 + p02_height(x, y)) if scene_profile == "p02" else -0.08
+            ground_z = -0.08 + (height_function(x, y) if height_function else 0.0)
             cylinder_between(f"weed_{patch:02d}_{blade:02d}", (x, y, ground_z),
                              (x + 0.05 * math.cos(angle), y + 0.05 * math.sin(angle), ground_z + h),
                              0.006, weed_mat, 5)
@@ -534,12 +557,13 @@ def write_initial_point_cloud(path, seed, count=100_000, plant_positions=FABRIC_
         "property float nx\nproperty float ny\nproperty float nz\n"
         "property uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n"
     ).encode("ascii")
+    height_function = surface_height_for(scene_profile)
     with path.open("wb") as stream:
         stream.write(header)
         for _ in range(count):
             if rng.random() < 0.82:
                 x, y = rng.uniform(-2.65, 2.65), rng.uniform(-3.80, 3.80)
-                z = rng.uniform(-0.16, 0.14) + (p02_height(x, y) if scene_profile == "p02" else 0.0)
+                z = rng.uniform(-0.16, 0.14) + (height_function(x, y) if height_function else 0.0)
                 color = (96, 91, 78) if abs(x) <= 2.5 and abs(y) <= 3.6 else (126, 78, 49)
             else:
                 px, py = rng.choice(plant_positions)
@@ -575,7 +599,10 @@ def blender_matrix_to_nerf(obj):
 
 
 def export_transforms(root, specs):
-    angle_x = 2 * math.atan(36.0 / (2 * 35.0))
+    focal_lengths = {float(spec["focal_length_mm"]) for spec in specs}
+    if len(focal_lengths) != 1:
+        raise ValueError("A transforms file requires one shared focal length")
+    angle_x = 2 * math.atan(36.0 / (2 * next(iter(focal_lengths))))
     grouped = {"train": [], "test": []}
     for spec in specs:
         cam = add_camera(f"dataset_camera_{spec['frame']:05d}", spec)
@@ -626,7 +653,7 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def configure_world(scene):
+def configure_world(scene, scene_profile="p01"):
     scene.world.use_nodes = True
     bg = next((node for node in scene.world.node_tree.nodes if node.type == "BACKGROUND"), None)
     if bg is None:
@@ -637,17 +664,27 @@ def configure_world(scene):
         scene.world.node_tree.links.new(bg.outputs["Background"], output.inputs["Surface"])
     sky = scene.world.node_tree.nodes.new("ShaderNodeTexSky")
     sky.sky_type = "MULTIPLE_SCATTERING"
-    sky.sun_elevation = math.radians(38)
-    sky.sun_rotation = math.radians(128)
+    if scene_profile == "p03":
+        sky.sun_elevation = math.radians(52)
+        sky.sun_rotation = math.radians(204)
+    elif scene_profile == "p04":
+        sky.sun_elevation = math.radians(24)
+        sky.sun_rotation = math.radians(72)
+    else:
+        sky.sun_elevation = math.radians(38)
+        sky.sun_rotation = math.radians(128)
     sky.altitude = 850.0
     scene.world.node_tree.links.new(sky.outputs["Color"], bg.inputs["Color"])
-    bg.inputs["Strength"].default_value = 0.24
+    bg.inputs["Strength"].default_value = 0.42 if scene_profile == "p03" else 0.24
     light_data = bpy.data.lights.new("sun_data", "SUN")
-    light_data.energy = 2.8
-    light_data.angle = math.radians(12)
+    light_data.energy = 1.8 if scene_profile == "p03" else (3.2 if scene_profile == "p04" else 2.8)
+    light_data.angle = math.radians(24 if scene_profile == "p03" else (5 if scene_profile == "p04" else 12))
     sun = bpy.data.objects.new("sun", light_data)
     bpy.context.collection.objects.link(sun)
-    sun.rotation_euler = (math.radians(28), math.radians(-18), math.radians(-32))
+    if scene_profile == "p04":
+        sun.rotation_euler = (math.radians(48), math.radians(-8), math.radians(62))
+    else:
+        sun.rotation_euler = (math.radians(28), math.radians(-18), math.radians(-32))
     area_data = bpy.data.lights.new("sky_fill_data", "AREA")
     area_data.energy = 900
     area_data.shape = "DISK"
@@ -661,13 +698,21 @@ def main():
     args = arguments()
     if args.dataset_version == "v7" and not args.coffee_asset:
         raise ValueError("V7 requires the recorded licensed coffee asset")
-    if args.scene_profile == "p02" and args.dataset_version != "v7":
-        raise ValueError("P02 is defined only for the balanced V7 camera/data protocol")
-    scene_id = ("P02_undulating_medium_occlusion_v7_balanced96" if args.scene_profile == "p02"
+    if args.scene_profile != "p01" and args.dataset_version != "v7":
+        raise ValueError("P02/P03/P04 are defined only for the balanced V7 camera/data protocol")
+    if args.scene_profile in HELDOUT_PROFILES and args.seed != HELDOUT_PROFILES[args.scene_profile]["seed"]:
+        raise ValueError(
+            f"{args.scene_profile.upper()} is pre-registered with seed "
+            f"{HELDOUT_PROFILES[args.scene_profile]['seed']}; changing it would invalidate held-out status"
+        )
+    scene_id = (HELDOUT_PROFILES[args.scene_profile]["scene_id"]
+                if args.scene_profile in HELDOUT_PROFILES
+                else "P02_undulating_medium_occlusion_v7_balanced96" if args.scene_profile == "p02"
                 else "P01_flat_low_occlusion_v7_balanced96" if args.dataset_version == "v7"
                 else "P01_flat_low_occlusion_v6_paper_ready" if args.coffee_asset else SCENE_ID)
-    plant_positions = P02_PLANTS if args.scene_profile == "p02" else FABRIC_PLANTS
-    surface_height = p02_height if args.scene_profile == "p02" else None
+    heldout = HELDOUT_PROFILES.get(args.scene_profile)
+    plant_positions = heldout["plant_positions"] if heldout else (P02_PLANTS if args.scene_profile == "p02" else FABRIC_PLANTS)
+    surface_height = surface_height_for(args.scene_profile)
     root = Path(args.output).expanduser().resolve() / scene_id
     for folder in ("images", "bsr_masks", "depth", "fabric_depth", "normals", "ground_truth", "previews", "logs"):
         (root / folder).mkdir(parents=True, exist_ok=True)
@@ -687,7 +732,7 @@ def main():
     else:
         scene.render.image_settings.color_mode = "RGBA"
     scene.view_settings.look = "AgX - Medium High Contrast"
-    configure_world(scene)
+    configure_world(scene, args.scene_profile)
 
     soil = procedural_material("authored_soil", ((0.095, 0.026, 0.008), (0.34, 0.105, 0.027)), 0.93, 5.5, 0.34)
     fabric_mat = procedural_material("authored_nonwoven_fabric", ((0.006, 0.009, 0.008), (0.035, 0.047, 0.038)), 0.86, 115.0, 0.18)
@@ -705,7 +750,8 @@ def main():
     fabric["is_ground_truth"] = True
     for i, x in enumerate((-2.58, 2.58)):
         for j, y in enumerate((-3.68, 3.68)):
-            cube(f"support_post_{i}_{j}", (x, y, 0.11), (0.055, 0.055, 0.25), post_mat, 0.015)
+            post_surface_z = surface_height(x, y) if surface_height else 0.0
+            cube(f"support_post_{i}_{j}", (x, y, 0.11 + post_surface_z), (0.055, 0.055, 0.25), post_mat, 0.015)
 
     asset_record = None
     if args.coffee_asset:
@@ -715,7 +761,8 @@ def main():
             asset_path, plant_positions, rng, args.asset_up_axis,
             exclude_materials=excluded_materials,
             surface_height=surface_height,
-            height_range=(0.42, 0.82) if args.scene_profile == "p02" else (0.48, 0.72),
+            height_range=(heldout["plant_height_range"] if heldout else
+                          (0.42, 0.82) if args.scene_profile == "p02" else (0.48, 0.72)),
         )
         asset_record = {
             "title": args.asset_title, "author": args.asset_author,
@@ -733,7 +780,7 @@ def main():
         if not args.coffee_asset:
             coffee_plant(index, x, y, -0.09 + local_surface_z, rng, stem, leaves)
         protective_ring(index, x, y, guard_mat, local_surface_z)
-    scatter_ground_detail(rng, soil, dry_leaf_mat)
+    scatter_ground_detail(rng, soil, dry_leaf_mat, args.scene_profile)
     scatter_weeds(rng, weed_mat, args.scene_profile)
 
     specs = camera_plan(args.views, args.seed, args.dataset_version)
@@ -744,10 +791,12 @@ def main():
                                   plant_positions=plant_positions,
                                   scene_profile=args.scene_profile)
 
-    prefix = "P02" if args.scene_profile == "p02" else "P01"
+    prefix = args.scene_profile.upper()
+    detail_x, detail_y = plant_positions[0]
+    detail_z = surface_height(detail_x, detail_y) if surface_height else 0.0
     preview_specs = {
         f"{prefix}_paper_overview.png": {"position": [5.7, -6.6, 6.9], "look_at": [0.0, 0.0, 0.12], "focal_length_mm": 58.0, "fstop": 9.0},
-        f"{prefix}_root_detail.png": {"position": [3.10, -1.85, 1.02], "look_at": [1.72, -2.58, 0.16], "focal_length_mm": 72.0, "fstop": 4.5},
+        f"{prefix}_root_detail.png": {"position": [detail_x + 1.35, detail_y + 0.70, 1.02 + detail_z], "look_at": [detail_x, detail_y, 0.16 + detail_z], "focal_length_mm": 72.0, "fstop": 4.5},
         f"{prefix}_row_level.png": {"position": [0.0, -5.25, 0.68], "look_at": [0.0, 0.65, 0.22], "focal_length_mm": 65.0, "fstop": 7.1},
     }
 
@@ -781,17 +830,20 @@ def main():
         "schema": SCHEMA,
         "scene_id": scene_id,
         "dataset_type": "synthetic",
-        "status": ("P02_v7_frozen_validation_candidate" if args.scene_profile == "p02"
+        "status": ("heldout_candidate_unfrozen_do_not_train" if heldout
+                   else "P02_v7_frozen_validation_candidate" if args.scene_profile == "p02"
                    else "P01_v7_balanced96_trainable_candidate" if args.dataset_version == "v7"
                    else "P01_v6_paper_ready_trainable_prototype" if asset_record
                    else "P01_v4_cycles_photoreal_attempt_not_final_benchmark"),
         "seed": args.seed,
         "units": "metres",
-        "scene_role": "validation" if args.scene_profile == "p02" else "development",
-        "morphology": ("continuous_undulating_relief_with_mild_directional_slope"
+        "scene_role": heldout["role"] if heldout else ("validation" if args.scene_profile == "p02" else "development"),
+        "morphology": (heldout["morphology"] if heldout else
+                       "continuous_undulating_relief_with_mild_directional_slope"
                        if args.scene_profile == "p02"
                        else "flat_with_independent_multifrequency_micro_relief"),
-        "occlusion_level": "medium" if args.scene_profile == "p02" else "low",
+        "occlusion_level": heldout["occlusion_level"] if heldout else ("medium" if args.scene_profile == "p02" else "low"),
+        "lighting_protocol": heldout["lighting"] if heldout else "stable_daylight",
         "plant_count": len(plant_positions),
         "vegetation_label": "licensed_external_coffee_asset" if asset_record else "procedural_juvenile_coffee_proxy_calibrated_qualitatively_from_project_field_photos_not_botanically_validated",
         "field_reference_use": "project-supplied photographs used for qualitative morphology and layout only; no pixels or textures copied",

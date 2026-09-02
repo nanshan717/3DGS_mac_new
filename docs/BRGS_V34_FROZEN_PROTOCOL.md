@@ -53,8 +53,9 @@ reported as a development study or ablation with that designation.
 
 ## Required final validation
 
-1. Complete the declared P01/P02 three-seed development matrix without further tuning.
-2. Generate scene-level validation and held-out P03/P04 scenes with new seeds and geometry.
+1. Complete the declared P01/P02 three-seed development matrix without further tuning
+   (completed: 12/12 validated runs).
+2. Generate the pre-registered held-out P03/P04 scenes with seeds 303/404 and new geometry.
 3. Freeze P03/P04 manifests, images, masks, camera splits, GT meshes, and checksums before
    any baseline or BR-GS result is inspected.
 4. Run official 3DGS and BR-GS v3.4 with seeds 0, 1, and 2.
@@ -62,6 +63,9 @@ reported as a development study or ablation with that designation.
    metrics; retain per-run JSON files.
 6. Include official 3DGS, 2DGS, and at least one geometry-focused Gaussian baseline.
 7. Evaluate real coffee-field captures separately and label synthetic and real results.
+
+The executable P03/P04 freeze and run procedure is documented in
+`docs/HELDOUT_V34_EXPERIMENT_PROTOCOL.md`.
 
 ## Seeded BR-GS command
 

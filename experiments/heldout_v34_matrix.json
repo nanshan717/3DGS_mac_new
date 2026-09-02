@@ -1,0 +1,41 @@
+{
+  "schema": "brgs-frozen-v34-matrix-v1",
+  "status": "preregistered",
+  "iterations": 15000,
+  "resolution": 1,
+  "seeds": [0, 1, 2],
+  "brgs_repo": "/home/featurize/work/3DGS_mac_new",
+  "official_repo": "/home/featurize/work/gaussian-splatting-p01-compat",
+  "scenes": {
+    "P03": {
+      "role": "held_out",
+      "profile": "p03",
+      "dataset_seed": 303,
+      "source": "/home/featurize/work/3DGS_mac_new/data/CoffeeFabric-Syn/heldout/P03_sloped_high_occlusion_v7_heldout96"
+    },
+    "P04": {
+      "role": "held_out",
+      "profile": "p04",
+      "dataset_seed": 404,
+      "source": "/home/featurize/work/3DGS_mac_new/data/CoffeeFabric-Syn/heldout/P04_piecewise_mixed_occlusion_v7_heldout96"
+    }
+  },
+  "methods": {
+    "official_3dgs": {
+      "repo": "official_repo",
+      "output_pattern": "output/{scene}_official_3dgs_15k_s{seed}",
+      "train_flags": []
+    },
+    "brgs_v34": {
+      "repo": "brgs_repo",
+      "output_pattern": "output/{scene}_brgs_v34_15k_s{seed}",
+      "train_flags": ["--bsr_v34"]
+    }
+  },
+  "notes": [
+    "P03 and P04 geometry, seeds, camera protocol, lighting and occlusion were declared before training.",
+    "This file remains preregistered until tools/freeze_heldout_v34.py validates both complete datasets and anchors their locks.",
+    "Do not train, render metrics, or inspect reconstruction results until status becomes frozen.",
+    "The BR-GS v3.4 defaults are immutable and no threshold override is permitted."
+  ]
+}
