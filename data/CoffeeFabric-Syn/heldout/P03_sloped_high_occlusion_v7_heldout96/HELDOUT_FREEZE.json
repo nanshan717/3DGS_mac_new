@@ -1,0 +1,12 @@
+{
+  "schema": "coffee-fabric-syn-heldout-freeze-v1",
+  "scene": "P03",
+  "scene_id": "P03_sloped_high_occlusion_v7_heldout96",
+  "profile": "p03",
+  "dataset_seed": 303,
+  "frozen_at_utc": "2026-09-02T05:34:02+00:00",
+  "file_count": 206,
+  "sha256sums_sha256": "214769c2f6e5bed40ce279b1fcffacd0a136caab33e6dde18eebd3faf412d780",
+  "metadata_sha256": "f71cf9ce64793f8571cd81c3f98a5b52f1deb049992545d371344595762efaac",
+  "training_started_before_freeze": false
+}

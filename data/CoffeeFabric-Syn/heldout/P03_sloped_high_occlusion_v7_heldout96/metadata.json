@@ -1,0 +1,44 @@
+{
+  "schema": "coffee-fabric-syn-v1",
+  "scene_id": "P03_sloped_high_occlusion_v7_heldout96",
+  "dataset_type": "synthetic",
+  "status": "heldout_frozen_before_training",
+  "seed": 303,
+  "units": "metres",
+  "scene_role": "held_out",
+  "morphology": "cross_slope_with_transverse_wrinkles",
+  "occlusion_level": "high",
+  "lighting_protocol": "overcast_soft",
+  "plant_count": 16,
+  "vegetation_label": "licensed_external_coffee_asset",
+  "field_reference_use": "project-supplied photographs used for qualitative morphology and layout only; no pixels or textures copied",
+  "asset_policy": "external asset with recorded CC attribution",
+  "coffee_asset": {
+    "title": "A coffee tree",
+    "author": "rvezy",
+    "license": "CC-BY-4.0",
+    "source_url": "https://sketchfab.com/3d-models/a-coffee-tree-045dba854c8d4b9e8a5dff2d18892df1",
+    "local_source_file": "a_coffee_tree.glb",
+    "source_sha256": "346368f5372a09e9536d3e320dbe626c99ee713a9a7210dd11467e593ca83472",
+    "declared_up_axis": "Z",
+    "excluded_materials": [
+      "Cobblestone"
+    ],
+    "modifications": "metric height normalization, linked instancing, random Z rotation and scale variation",
+    "source_meshes": 3,
+    "instanced_objects": 48,
+    "source_height": 1.6046748047536141
+  },
+  "renderer": {
+    "blender": "5.2.0 LTS",
+    "engine": "CYCLES",
+    "samples": 48,
+    "denoising": true
+  },
+  "camera_count": 96,
+  "camera_protocol": "balanced_paired_84_train_12_test_internal_holdout",
+  "rgb_dataset_rendered": true,
+  "dataset_resolution": 800,
+  "license_status": "candidate_pending_project_review",
+  "frozen_at_utc": "2026-09-02T05:34:02+00:00"
+}
