@@ -1,0 +1,25 @@
+% Requires: \usepackage{booktabs,graphicx}
+\begin{table*}[t]
+\centering
+\caption{BR-GS v3.4 compared with official 3DGS. Values are mean $\pm$ sample standard deviation over three paired training seeds. P01--P02 are development scenes; P03--P04 are pre-registered held-out scenes. Bold marks the better mean within each scene and does not denote statistical significance.}
+\label{tab:v34-main}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrrr}
+\toprule
+Scene & Method & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & Points (k)$\downarrow$ & Chamfer (m)$\downarrow$ & Completeness (m)$\downarrow$ & F@5cm$\uparrow$ \\
+\midrule
+\multicolumn{9}{l}{\emph{Development}} \\
+P01 & Official 3DGS & 18.889 $\pm$ 0.631 & 0.7946 $\pm$ 0.0011 & 0.3762 $\pm$ 0.0023 & 676 $\pm$ 43 & \textbf{0.0660 $\pm$ 0.0003} & 0.0396 $\pm$ 0.0006 & \textbf{0.4399 $\pm$ 0.0054} \\
+P01 & BR-GS v3.4 & \textbf{19.128 $\pm$ 0.435} & \textbf{0.7955 $\pm$ 0.0011} & \textbf{0.3724 $\pm$ 0.0050} & \textbf{485 $\pm$ 26} & 0.0664 $\pm$ 0.0002 & \textbf{0.0379 $\pm$ 0.0001} & 0.4353 $\pm$ 0.0017 \\
+P02 & Official 3DGS & 17.897 $\pm$ 0.160 & \textbf{0.7078 $\pm$ 0.0004} & 0.3987 $\pm$ 0.0010 & 1175 $\pm$ 156 & 0.0656 $\pm$ 0.0009 & 0.0364 $\pm$ 0.0002 & 0.4510 $\pm$ 0.0021 \\
+P02 & BR-GS v3.4 & \textbf{18.084 $\pm$ 0.125} & 0.7074 $\pm$ 0.0013 & \textbf{0.3946 $\pm$ 0.0016} & \textbf{815 $\pm$ 112} & \textbf{0.0641 $\pm$ 0.0009} & \textbf{0.0348 $\pm$ 0.0004} & \textbf{0.4535 $\pm$ 0.0044} \\
+\midrule
+\multicolumn{9}{l}{\emph{Pre-registered held-out}} \\
+P03 & Official 3DGS & 21.614 $\pm$ 0.303 & 0.8874 $\pm$ 0.0012 & 0.1696 $\pm$ 0.0024 & 1338 $\pm$ 69 & \textbf{0.0367 $\pm$ 0.0002} & 0.0281 $\pm$ 0.0001 & \textbf{0.7524 $\pm$ 0.0009} \\
+P03 & BR-GS v3.4 & \textbf{21.628 $\pm$ 0.039} & \textbf{0.8887 $\pm$ 0.0011} & \textbf{0.1675 $\pm$ 0.0026} & \textbf{1271 $\pm$ 9} & 0.0383 $\pm$ 0.0003 & \textbf{0.0266 $\pm$ 0.0003} & 0.7441 $\pm$ 0.0032 \\
+P04 & Official 3DGS & \textbf{23.610 $\pm$ 1.366} & \textbf{0.8971 $\pm$ 0.0068} & \textbf{0.2020 $\pm$ 0.0067} & 830 $\pm$ 20 & 0.0453 $\pm$ 0.0046 & 0.0240 $\pm$ 0.0004 & \textbf{0.7613 $\pm$ 0.0102} \\
+P04 & BR-GS v3.4 & 23.457 $\pm$ 1.234 & 0.8894 $\pm$ 0.0116 & 0.2098 $\pm$ 0.0165 & \textbf{788 $\pm$ 21} & \textbf{0.0415 $\pm$ 0.0041} & \textbf{0.0233 $\pm$ 0.0001} & 0.7487 $\pm$ 0.0072 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table*}
